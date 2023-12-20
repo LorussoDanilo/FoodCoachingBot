@@ -1,3 +1,4 @@
+import os
 import threading
 import openai
 from dotenv import load_dotenv
@@ -12,9 +13,9 @@ from reminder.reminder import periodic_task, send_periodic_reminders
 load_dotenv()
 
 # constant
-MONGODB_URI = 'mongodb+srv://dlorusso43:<password>@foodcoachusers.zzjc9vh.mongodb.net/?retryWrites=true&w=majority'
-COLLECTION_NAME = 'users'
-DATABASE_NAME = 'foodCoachUsers'
+MONGODB_URI = os.getenv('MONGODB_URI')
+COLLECTION_NAME = os.getenv('COLLECTION_NAME')
+DATABASE_NAME = os.getenv('foodCoachUsers')
 START_COMMAND = 'start'
 
 if __name__ == '__main__':
