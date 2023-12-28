@@ -4,8 +4,8 @@ from datetime import datetime, time
 from handle_user_data import get_all_telegram_ids
 
 
-def send_periodic_reminders(telegram_id, user_profiles_collection, bot_telegram):
-    telegram_ids = get_all_telegram_ids(user_profiles_collection)
+def send_periodic_reminders(telegram_id, users, bot_telegram):
+    telegram_ids = get_all_telegram_ids(users)
     for telegram_id in telegram_ids:
         send_meal_reminder(telegram_id, "colazione", bot_telegram)
         send_meal_reminder(telegram_id, "pranzo", bot_telegram)
@@ -28,6 +28,6 @@ def send_meal_reminder(telegram_id, meal_type, bot_telegram):
 
 
 # Funzione per eseguire le attività periodicamente
-def periodic_task(user_profiles_collection, bot_telegram, event):
+def periodic_task(users, bot_telegram, event):
     while not event.wait(60 * 60 * 24):  # Wait for 24 hours
-        send_periodic_reminders(user_profiles_collection, bot_telegram)
+        send_periodic_reminders(users, bot_telegram)

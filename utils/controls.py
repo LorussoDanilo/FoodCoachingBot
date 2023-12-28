@@ -2,16 +2,19 @@
 def is_food_question(question):
     # Aggiungi qui la tua logica per determinare se la domanda riguarda il cibo
     # Ad esempio, potresti usare delle parole chiave o espressioni regolari
-    food_keywords = ["cibo", "pasto", "mangiare", "malattie", "disturbi", "nutrizionali", "ingredienti", "ingrediente", "Cibo e Nutrizione",
-                     "Alimenti", "Nutrienti", "Dieta" , "Proteine", "Carboidrati", "Grassi", "Fibre", "Vitamine", "Minerali", "Calorie", "Antiossidanti",
+    food_keywords = ["cibo", "pasto", "mangiare", "malattie", "disturbi", "nutrizionali", "ingredienti", "ingrediente",
+                     "Cibo e Nutrizione", "Alimenti", "Nutrienti", "Dieta" , "Proteine", "Carboidrati", "Grassi",
+                     "Fibre", "Vitamine", "Minerali", "Calorie", "Antiossidanti",
                      "Superfood", "Alimenti biologici", "Alimenti integrali", "Pianta-based", "Prodotti "
                      "lattiero-caseari", "Gluten-free", "Vegetariano", "Vegano", "Peso corporeo", "Diabete",
                      "Colesterolo", "Pressione sanguigna", "Idratazione", "Cibo sano",
-                     "Obesità", "Diabete di tipo 2", "Malattie cardiache", "Iperlipidemia", "Ipertensione", "Aterosclerosi", "Celiachia", "Intolleranze alimentari",
+                     "Obesità", "Diabete di tipo 2", "Malattie cardiache", "Iperlipidemia", "Ipertensione",
+                     "Aterosclerosi", "Celiachia", "Intolleranze alimentari",
                      "Allergie alimentari", "Disturbi alimentari", "Anoressia nervosa", "Bulimia nervosa", "Sovrappeso",
-                     "Malnutrizione", "Disturbi metabolici", "Gotta", "Osteoporosi", "Anemia", "Disturbi gastrointestinali",
-                     "Reflusso gastroesofageo", "Malattia del fegato grasso non alcolico", "Sindrome metabolica", "Sindrome dell'Intestino Irritabile"
-                     "Diarrea", "Costipazione"]
+                     "Malnutrizione", "Disturbi metabolici", "Gotta", "Osteoporosi", "Anemia",
+                     "Disturbi gastrointestinali", "Reflusso gastroesofageo",
+                     "Malattia del fegato grasso non alcolico", "Sindrome metabolica",
+                     "Sindrome dell'Intestino Irritabile", "Diarrea", "Costipazione"]
     return any(keyword in question.lower() for keyword in food_keywords)
 
 

@@ -1,10 +1,8 @@
 # Funzione che gestisce i pasti inviati dall'utente
 from datetime import datetime, time
 
-from pymongo import UpdateOne
 
-
-def handle_user_meal(user_id, message_text, user_profiles_collection):
+def handle_user_meal(user_id, message_text, mysql_cursor):
     # Puoi implementare la tua logica per estrarre i dati relativi al cibo dal messaggio
     # Ad esempio, puoi usare espressioni regolari o altri metodi di parsing
     # Qui, supponiamo che il messaggio contenga solo il cibo inserito dall'utente
@@ -22,50 +20,41 @@ def handle_user_meal(user_id, message_text, user_profiles_collection):
 
     if meal_type:
         # Salva il pasto nel database
-        save_user_meal(user_id, meal_type, food, user_profiles_collection)
+        save_user_meal(user_id, meal_type, food, mysql_cursor)
 
 
-# Metodo per salvare sul database la dieta settimanale dell'utente
-def save_user_meal(user_id, meal_type, food, user_profiles_collection):
+def save_user_meal(user_id, meal_type, food, mysql_cursor):
     current_time = datetime.now()
 
-    # Trova il profilo utente corrispondente
-    user_profile = user_profiles_collection.find_one({'telegram_id': user_id})
+    # Ottieni la data corrente
+    current_date = current_time.date()
 
-    # Controlla se il profilo utente esiste
-    if user_profile:
-        # Ottieni la data corrente
-        current_date = current_time.date()
+    # Ottieni la settimana corrente e il giorno della settimana
+    week_number = current_time.strftime("%U")
+    weekday = current_time.strftime("%A").lower()
 
-        # Ottieni la settimana corrente e il giorno della settimana
-        week_number = current_time.strftime("%U")
-        weekday = current_time.strftime("%A").lower()
+    # Verifica se è cambiata la settimana
+    mysql_cursor.execute("SELECT weekly_diet_last_week, weekly_diet_counter FROM utenti WHERE telegram_id = %s",
+                         (user_id,))
+    result = mysql_cursor.fetchone()
 
-        # Verifica se è cambiata la settimana
-        if 'last_week' in user_profile.get('weekly_meals', {}):
-            last_week = user_profile['weekly_meals']['last_week']
-            if last_week != week_number:
-                # Aggiorna il contatore settimanale e salva la settimana attuale
-                user_profiles_collection.update_one(
-                    {'telegram_id': user_id},
-                    {
-                        '$set': {
-                            'weekly_diet.last_week': week_number,
-                            'weekly_diet.counter': user_profile.get('weekly_meals', {}).get('counter', 0) + 1
-                        }
-                    }
-                )
+    if result:
+        last_week, counter = result
 
-        # Costruisci il percorso nel documento per inserire il pasto
-        path = f'weekly_meals.{week_number}.days.{weekday}.{meal_type}.food'
+        if last_week != week_number:
+            # Aggiorna il contatore settimanale e salva la settimana attuale
+            mysql_cursor.execute(
+                "UPDATE utenti SET weekly_diet_last_week = %s, weekly_diet_counter = %s WHERE telegram_id = %s",
+                (week_number, counter + 1, user_id))
+    else:
+        # Se l'utente non ha ancora una voce nella tabella utenti, inseriscila
+        mysql_cursor.execute(
+            "INSERT INTO utenti (telegram_id, weekly_diet_last_week, weekly_diet_counter) VALUES (%s, %s, %s)",
+            (user_id, week_number, 1))
 
-        # Crea l'oggetto UpdateOne per l'operazione di aggiornamento
-        update_operation = UpdateOne(
-            {'telegram_id': user_id},
-            {'$set': {path: food}},
-            upsert=True
-        )
+    # Costruisci il percorso nel documento per inserire il pasto
+    column_name = f'weekly_meals_{week_number}_{weekday}_{meal_type}_food'
+    sql_query = f"UPDATE utenti SET {column_name} = %s WHERE telegram_id = %s"
 
-        # Esegui l'operazione di aggiornamento nel database
-        user_profiles_collection.bulk_write([update_operation])
-
+    # Esegui l'operazione di aggiornamento nel database
+    mysql_cursor.execute(sql_query, (food, user_id))
