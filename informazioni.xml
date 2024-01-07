@@ -4,26 +4,18 @@
         <informazioni type="start">
             <spiegazioni>
                 ciao {nome} 👋 _bn_
-                Il bot ti consente di porre una qualsiasi domanda riguardo i valori nutrizionali di un qualsiasi ingredente o piatto.
-                E' possibile anche chiedere qual è la migliore dieta da seguire in base alle proprie condizioni mediche.
-                Inoltre, il bot fornisce una lista di cibi e disturbi per accedere facilmente a queste informazioni.
-                Digitare il comando /help oppure dal menu scegliere il comando /help per poter ricevere maggiori informazioni.
-            </spiegazioni>
-        </informazioni>
-        <informazioni type="help">
-            <funzionalita>
-                /cibi per visualizzare una lista di cibi con l'obiettivo di poterne visualizzare i valori nutrizionali e le malattie per le quali non è consigliato quel cibo _bn_
-                /malattie per visualizzare la lista delle malattie che gestisce il bot comunicando la corretta dieta da seguire
-            </funzionalita>
-        </informazioni>
-        <informazioni type="eta">
-            <spiegazioni>
-                puoi inserirmi la tua età?
-            </spiegazioni>
-        </informazioni>
+                Questo bot ti supporterà nel seguire una dieta corretta inviandoti dei reminder nel corso della giornata per chiederti cosa hai mangiato,
+                ed una volta a settimana ti manderà un reminder per comunicarti se hai conseguito una dieta sana o meno in base alle
+                informazioni del tuo profilo fornite da te.
 
-        <informazioni type="malattie">
+                Inoltre, puoi porre una qualsiasi domanda riguardo al cibo come i valori nutrizionali
+                dei piatti da te consumati e consigli alimentari in base ai tuoi disturbi o patologie.
 
+                Ora, rispondendo alle domande qui di seguito consentirai al bot di essere più efficente.
+
+                Grazie e buon utilizzo 😊
+
+            </spiegazioni>
         </informazioni>
     </telegram>
     <openai>

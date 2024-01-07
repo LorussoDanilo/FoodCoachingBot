@@ -65,75 +65,68 @@ def get_all_telegram_ids(mysql_cursor):
     return [row[0] for row in result]
 
 
-def ask_user_info(telegram_id, bot, questions_and_fields):
-    """
-    Ask the user for information and update the user profile in the database.
+def ask_user_info(telegram_id, bot, questions_and_fields, state):
+    state = {
+        'current_index': 0,
+        'user_state': {field: False for _, field in questions_and_fields}
+    }
 
-    :param telegram_id: Telegram user ID
-    :param bot: Telegram bot
-    :param questions_and_fields: List of tuples containing (question, field) pairs
-    """
-    # Initialize user state
-    user_state = {field: False for _, field in questions_and_fields}
+    current_question, current_field = questions_and_fields[state['current_index']]
 
     @bot.message_handler(func=lambda message: message.chat.id == telegram_id)
     def handle_user_response(message):
-        # Your message handling logic here
+        try:
+            nonlocal current_question, current_field
+            user_response = str(message.text)  # Assicurati che user_response sia una stringa
+            telegram_user_id = message.chat.id
 
-        global question
-        nonlocal user_state
+            # Connessione a MySQL e ottenimento di un cursore
+            mysql_connection, cursor = connect_mysql()
 
-        # Extract necessary information from the user's message
-        user_response = message.text
-        telegram_user_id = message.chat.id
-
-        # Connect to MySQL and get a cursor
-        mysql_connection, cursor = connect_mysql()
-
-        # Find the field corresponding to the user's response
-        current_field = None
-        for question, field in questions_and_fields:
-            if not user_state[field]:
-                current_field = field
-                break
-
-        if current_field:
-            # Execute the query to update the user's profile in the database
+            # Esecuzione della query per aggiornare il profilo dell'utente nel database
             update_query = f"UPDATE utenti SET {current_field} = %s WHERE telegram_id = %s"
             cursor.execute(update_query, (user_response, telegram_user_id))
 
-            # Send a confirmation message to the user
+            # Invio di un messaggio di conferma all'utente
             confirmation_message = f"{current_field} salvat*: {user_response}"
             bot.send_message(telegram_user_id, confirmation_message)
 
-            # Close the cursor
+            # Commit delle modifiche al database
+            mysql_connection.commit()
+
+            # Chiusura del cursore
             cursor.close()
 
-            # Update the user state
-            user_state[current_field] = True
+            # Aggiornamento dello stato dell'utente
+            state['user_state'][current_field] = True
 
-            # Check if there are more questions to ask
-            next_field = None
-            for question, field in questions_and_fields:
-                if not user_state[field]:
-                    next_field = field
-                    break
-
+            # Verifica se ci sono altre domande da fare
+            next_question, next_field = get_next_question(state['user_state'])
             if next_field:
-                # Ask the next question
-                bot.send_message(telegram_user_id, question)
-                return
+                # Fai la prossima domanda
+                bot.send_message(telegram_user_id, next_question)
+                current_question, current_field = next_question, next_field
+            else:
+                # Se tutte le domande sono state risposte, invia un messaggio finale
+                bot.send_message(telegram_user_id, "Grazie per le risposte! Il tuo profilo è completo. Puoi chiedere "
+                                                   "al chatbot ciò che desideri!")
+                # Chiudi la connessione al database
+                mysql_connection.close()
 
-            # If all questions are answered, send a final message
-            bot.send_message(telegram_user_id, "Grazie per le risposte! Ora possiamo procedere con altro.")
-            mysql_connection.commit()
-            # Additional logic for the next step...
+                # Chiudi il cursore
+                cursor.close()
 
-    # Ask the first question
-    first_question, first_field = questions_and_fields[0]
-    bot.send_message(telegram_id, first_question)
+        except Exception as e:
+            print(f"Errore durante la gestione della risposta: {e}")
 
-    # Register the message handler
+    def get_next_question(user_state):
+        for question, field in questions_and_fields:
+            if not user_state[field]:
+                return question, field
+        return None, None
+
+    # Inizia con la prima domanda
+    bot.send_message(telegram_id, current_question)
+
+    # Registra l'handler del messaggio per la prima domanda
     bot.add_message_handler(handle_user_response)
-
-

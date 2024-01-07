@@ -1,4 +1,6 @@
 # metodo per determinare se la domanda riguarda il cibo
+import re
+
 def is_food_question(question):
     # Aggiungi qui la tua logica per determinare se la domanda riguarda il cibo
     # Ad esempio, potresti usare delle parole chiave o espressioni regolari
@@ -16,6 +18,8 @@ def is_food_question(question):
                      "Malattia del fegato grasso non alcolico", "Sindrome metabolica",
                      "Sindrome dell'Intestino Irritabile", "Diarrea", "Costipazione"]
     return any(keyword in question.lower() for keyword in food_keywords)
+
+
 
 
 # Decoratore per il controllo del testo in input

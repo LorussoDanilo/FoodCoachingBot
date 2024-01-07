@@ -30,4 +30,4 @@ def send_meal_reminder(telegram_id, meal_type, bot_telegram):
 # Funzione per eseguire le attività periodicamente
 def periodic_task(users, bot_telegram, event):
     while not event.wait(60 * 60 * 24):  # Wait for 24 hours
-        send_periodic_reminders(users, bot_telegram)
+        send_periodic_reminders(users, bot_telegram, users)
