@@ -1,4 +1,5 @@
-from utils.connection import connect_mysql
+from chatGPT_response import write_chatgpt
+from utils.connection import connect_mysql, connect
 
 
 def create_new_user(telegram_id, username):
@@ -65,68 +66,72 @@ def get_all_telegram_ids(mysql_cursor):
     return [row[0] for row in result]
 
 
-def ask_user_info(telegram_id, bot, questions_and_fields, state):
-    state = {
-        'current_index': 0,
-        'user_state': {field: False for _, field in questions_and_fields}
-    }
+def ask_user_info(telegram_id, bot, questions_and_fields):
+    index = 0  # Indice della domanda corrente
+    interview_complete = False  # Indica se l'intervista è stata completata
 
-    current_question, current_field = questions_and_fields[state['current_index']]
+    def ask_next_question():
+        nonlocal index, interview_complete
+        if not interview_complete and index < len(questions_and_fields):
+            question, field = questions_and_fields[index]
+            bot.send_message(telegram_id, question)
+        else:
+            # Se l'intervista è già stata completata, non fare nulla
+            pass
+
+    def send_completion_message():
+        bot.send_message(telegram_id, "Tutte le domande sono state risposte. Grazie!")
+
+
 
     @bot.message_handler(func=lambda message: message.chat.id == telegram_id)
     def handle_user_response(message):
+        nonlocal index, interview_complete
         try:
-            nonlocal current_question, current_field
-            user_response = str(message.text)  # Assicurati che user_response sia una stringa
-            telegram_user_id = message.chat.id
+            if not interview_complete:
+                user_response = str(message.text)
+                telegram_user_id = message.chat.id
 
-            # Connessione a MySQL e ottenimento di un cursore
-            mysql_connection, cursor = connect_mysql()
+                # Connessione a MySQL e ottenimento di un cursore
+                mysql_connection, cursor = connect_mysql()
 
-            # Esecuzione della query per aggiornare il profilo dell'utente nel database
-            update_query = f"UPDATE utenti SET {current_field} = %s WHERE telegram_id = %s"
-            cursor.execute(update_query, (user_response, telegram_user_id))
+                # Esecuzione della query per aggiornare il profilo dell'utente nel database
+                update_query = f"UPDATE utenti SET {questions_and_fields[index][1]} = %s WHERE telegram_id = %s"
+                cursor.execute(update_query, (user_response, telegram_user_id))
 
-            # Invio di un messaggio di conferma all'utente
-            confirmation_message = f"{current_field} salvat*: {user_response}"
-            bot.send_message(telegram_user_id, confirmation_message)
+                # Commit delle modifiche al database
+                mysql_connection.commit()
 
-            # Commit delle modifiche al database
-            mysql_connection.commit()
+                # Invio di un messaggio di conferma all'utente
+                confirmation_message = f"{questions_and_fields[index][1]} salvat*: {user_response}"
+                bot.send_message(telegram_user_id, confirmation_message)
 
-            # Chiusura del cursore
-            cursor.close()
-
-            # Aggiornamento dello stato dell'utente
-            state['user_state'][current_field] = True
-
-            # Verifica se ci sono altre domande da fare
-            next_question, next_field = get_next_question(state['user_state'])
-            if next_field:
-                # Fai la prossima domanda
-                bot.send_message(telegram_user_id, next_question)
-                current_question, current_field = next_question, next_field
-            else:
-                # Se tutte le domande sono state risposte, invia un messaggio finale
-                bot.send_message(telegram_user_id, "Grazie per le risposte! Il tuo profilo è completo. Puoi chiedere "
-                                                   "al chatbot ciò che desideri!")
                 # Chiudi la connessione al database
                 mysql_connection.close()
 
-                # Chiudi il cursore
-                cursor.close()
+                # Passa alla prossima domanda se ci sono ancora domande
+                index += 1
+                ask_next_question()
+
+                if index >= len(questions_and_fields):
+                    interview_complete = True
+                    send_completion_message()
+
+
 
         except Exception as e:
             print(f"Errore durante la gestione della risposta: {e}")
 
-    def get_next_question(user_state):
-        for question, field in questions_and_fields:
-            if not user_state[field]:
-                return question, field
-        return None, None
+    # Inizia chiedendo la prima domanda
+    ask_next_question()
 
-    # Inizia con la prima domanda
-    bot.send_message(telegram_id, current_question)
 
-    # Registra l'handler del messaggio per la prima domanda
-    bot.add_message_handler(handle_user_response)
+
+
+
+
+
+
+
+
+
