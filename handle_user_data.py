@@ -1,5 +1,6 @@
-from chatGPT_response import write_chatgpt
-from utils.connection import connect_mysql, connect
+from utils.connection import connect_mysql
+
+handle_user_response_gpt_enabled = False
 
 
 def create_new_user(telegram_id, username):
@@ -19,6 +20,7 @@ def create_new_user(telegram_id, username):
 
 
 def update_user_profile(field_name, user_profile, response):
+
     # Definisci le associazioni tra le parole chiave della risposta e i campi del profilo utente
     update_profile_fields = {
         'telegram_id': 'telegram_id',
@@ -33,6 +35,7 @@ def update_user_profile(field_name, user_profile, response):
     db_field = update_profile_fields.get(field_name.lower())
     if db_field and response:
         user_profile[db_field] = response
+    print(response)
 
 
 def get_user_profile(telegram_id):
@@ -43,7 +46,7 @@ def get_user_profile(telegram_id):
         # Query SQL to retrieve the user profile based on telegram_id
         mysql_cursor.execute("SELECT * FROM utenti WHERE telegram_id = %s", (telegram_id,))
         result = mysql_cursor.fetchone()
-
+        print(result)
         # Close the cursor
         mysql_cursor.close()
 
@@ -53,7 +56,7 @@ def get_user_profile(telegram_id):
     except Exception as e:
         print(f"Error getting user profile: {e}")
 
-        return {}  # Raising the exception to be caught by the calling code
+
 
 
 def get_all_telegram_ids(mysql_cursor):
@@ -66,72 +69,54 @@ def get_all_telegram_ids(mysql_cursor):
     return [row[0] for row in result]
 
 
-def ask_user_info(telegram_id, bot, questions_and_fields):
-    index = 0  # Indice della domanda corrente
-    interview_complete = False  # Indica se l'intervista è stata completata
+def ask_next_question_start(bot, questions_and_fields, telegram_id, index):
 
-    def ask_next_question():
-        nonlocal index, interview_complete
-        if not interview_complete and index < len(questions_and_fields):
-            question, field = questions_and_fields[index]
-            bot.send_message(telegram_id, question)
-        else:
-            # Se l'intervista è già stata completata, non fare nulla
-            pass
-
-    def send_completion_message():
-        bot.send_message(telegram_id, "Tutte le domande sono state risposte. Grazie!")
+    if index > len(questions_and_fields):
+        question, field = questions_and_fields[index]
+        bot.send_message(telegram_id, question)
 
 
 
-    @bot.message_handler(func=lambda message: message.chat.id == telegram_id)
-    def handle_user_response(message):
-        nonlocal index, interview_complete
+# Update data Funzione per fare domande per l'aggiornamento delle informazioni
+def ask_next_question(telegram_id, bot, questions_and_fields, index):
+    if index < len(questions_and_fields):
+        question, field = questions_and_fields[index]
+        bot.send_message(telegram_id, question)
+        # Registra la funzione di gestione della risposta
+        bot.register_next_step_handler_by_chat_id(telegram_id, lambda m: handle_update_response(m, telegram_id, bot,
+                                                                                                questions_and_fields,
+                                                                                                index))
+    else:
+        # Se tutte le domande sono state fatte, comunica all'utente che i dati sono stati aggiornati
+        bot.send_message(telegram_id, "I tuoi dati sono stati aggiornati con successo!")
+
+    # Funzione per gestire la risposta dell'utente
+    def handle_update_response(message, telegram_id, bot, questions_and_fields, index):
         try:
-            if not interview_complete:
-                user_response = str(message.text)
-                telegram_user_id = message.chat.id
+            user_response = str(message.text)
+            telegram_user_id = message.chat.id
+            # Check if the user exists in the database
+            user_profile = get_user_profile(telegram_id)
 
-                # Connessione a MySQL e ottenimento di un cursore
-                mysql_connection, cursor = connect_mysql()
+            # Connessione a MySQL e ottenimento di un cursore
+            mysql_connection, cursor = connect_mysql()
 
-                # Esecuzione della query per aggiornare il profilo dell'utente nel database
-                update_query = f"UPDATE utenti SET {questions_and_fields[index][1]} = %s WHERE telegram_id = %s"
-                cursor.execute(update_query, (user_response, telegram_user_id))
+            # Esecuzione della query per aggiornare il profilo dell'utente nel database
+            update_query = f"UPDATE utenti SET {questions_and_fields[index][1]} = %s WHERE telegram_id = %s"
+            cursor.execute(update_query, (user_response, telegram_user_id))
 
-                # Commit delle modifiche al database
-                mysql_connection.commit()
+            # Commit delle modifiche al database
+            mysql_connection.commit()
 
-                # Invio di un messaggio di conferma all'utente
-                confirmation_message = f"{questions_and_fields[index][1]} salvat*: {user_response}"
-                bot.send_message(telegram_user_id, confirmation_message)
+            # Invio di un messaggio di conferma all'utente
+            confirmation_message = f"{questions_and_fields[index][1]} aggiornato/a: {user_response}"
+            bot.send_message(telegram_user_id, confirmation_message)
 
-                # Chiudi la connessione al database
-                mysql_connection.close()
+            # Chiudi la connessione al database
+            mysql_connection.close()
 
-                # Passa alla prossima domanda se ci sono ancora domande
-                index += 1
-                ask_next_question()
-
-                if index >= len(questions_and_fields):
-                    interview_complete = True
-                    send_completion_message()
-
-
+            # Passa alla prossima domanda se ci sono ancora domande
+            ask_next_question(telegram_id, bot, questions_and_fields, index + 1)
 
         except Exception as e:
             print(f"Errore durante la gestione della risposta: {e}")
-
-    # Inizia chiedendo la prima domanda
-    ask_next_question()
-
-
-
-
-
-
-
-
-
-
-

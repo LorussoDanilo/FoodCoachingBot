@@ -13,8 +13,8 @@ def write_chatgpt(openai, message, profilo_utente):
 
         # Aggiungi le informazioni del profilo al messaggio di input per ChatGPT
         input_con_profilo = (
-            f"La mia età è: {eta} | Soffro di queste malattie: {', '.join(malattie)} | Io provo il seguente sentimento quando mangio: {emozione_mangiare}"
-            f" | Mettiti nei panni di un nutrizionista e tieni conto di queste informazioni e adatta il tuo linguaggio in base al sentimento che provo mentre mangio prima di rispondere alla seguente domanda:"
+            f"La mia età è: {eta} | Le/la mia malattia/e è/sono: {', '.join(malattie)} | Io quando mangio o penso al cibo provo un sentimento: {emozione_mangiare}"
+            f" | Mettiti nei panni di un nutrizionista,tieni conto di queste informazioni e adatta il tuo linguaggio considerando che provo {emozione_mangiare} quando mangio o penso al cibo, prima di rispondere alla seguente domanda:"
             f" | {message_text}"
         )
 
