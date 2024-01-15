@@ -1,4 +1,5 @@
 Chatbot su telegram per consigli dietetici.
+
 Profilazione:
 - L'utente viene profilato solo quando viene premuto il comando /start. Ovvero, quando avvia il bot. Gli viene chiesto: età, disturbi alimentari e l'emozione che prova quando mangia o pensa al cibo.
 Modifica dati profilo
