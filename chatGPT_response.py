@@ -7,14 +7,17 @@ def write_chatgpt(openai, message, profilo_utente):
         message_text = message.text if hasattr(message, 'text') else str(message)
 
         # Estrai le informazioni dal profilo dell'utente
-        eta = profilo_utente.get('eta', None)
-        malattie = profilo_utente.get('malattie', [])
-        emozione_mangiare = profilo_utente.get('emozione_mangiare', None)
+        eta = profilo_utente.get('eta')
+        malattie = profilo_utente.get('malattie')
+        emozione = profilo_utente.get('emozione')
 
         # Aggiungi le informazioni del profilo al messaggio di input per ChatGPT
         input_con_profilo = (
-            f"La mia età è: {eta} | Le/la mia malattia/e è/sono: {', '.join(malattie)} | Io quando mangio o penso al cibo provo un sentimento: {emozione_mangiare}"
-            f" | Mettiti nei panni di un nutrizionista,tieni conto di queste informazioni e adatta il tuo linguaggio considerando che provo {emozione_mangiare} quando mangio o penso al cibo, prima di rispondere alla seguente domanda:"
+            f"La mia età è: {eta} | Le/la mia malattia/e è/sono: {', '.join(malattie)} | Io quando mangio o penso al "
+            f"cibo provo un sentimento: {emozione}"
+            f" | Mettiti nei panni di un nutrizionista,tieni conto di queste informazioni e adatta il tuo linguaggio "
+            f"considerando che provo {emozione} quando mangio o penso al cibo, prima di rispondere alla seguente "
+            f"domanda:"
             f" | {message_text}"
         )
 
@@ -34,7 +37,7 @@ def write_chatgpt(openai, message, profilo_utente):
                 raw_response = response["choices"][0]["message"]["content"]
 
                 # Aggiungi personalizzazioni in base alle informazioni del profilo
-                if emozione_mangiare == 'Positivo':
+                if emozione == 'felicità':
                     raw_response += " Spero che tu possa continuare a goderti il tuo pasto felice!"
 
                 return raw_response
@@ -44,8 +47,8 @@ def write_chatgpt(openai, message, profilo_utente):
 
         else:
             # Se l'argomento non riguarda il cibo, restituisci una risposta specifica
-            return "Mi dispiace, non sono in grado di rispondere a domande su questo argomento. Rispondo solo a domande " \
-                   "riguardanti l'alimentazione."
+            return ("Mi dispiace, non sono in grado di rispondere a domande su questo argomento. Rispondo solo a "
+                    "domande riguardanti l'alimentazione.")
 
     except Exception as e:
         # Registra eventuali eccezioni che potrebbero verificarsi

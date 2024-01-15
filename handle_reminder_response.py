@@ -1,8 +1,13 @@
 # Funzione che gestisce i pasti inviati dall'utente
 from datetime import datetime, time
 
+from handle_user_data import get_all_telegram_ids
+from utils.connection import connect
 
-def handle_user_meal(user_id, message_text, mysql_cursor):
+openai, bot_telegram, root = connect()
+
+
+def handle_user_meal(telegram_id, message_text, mysql_cursor):
     # Puoi implementare la tua logica per estrarre i dati relativi al cibo dal messaggio
     # Ad esempio, puoi usare espressioni regolari o altri metodi di parsing
     # Qui, supponiamo che il messaggio contenga solo il cibo inserito dall'utente
@@ -20,7 +25,7 @@ def handle_user_meal(user_id, message_text, mysql_cursor):
 
     if meal_type:
         # Salva il pasto nel database
-        save_user_meal(user_id, meal_type, food, mysql_cursor)
+        save_user_meal(telegram_id, meal_type, food, mysql_cursor)
 
 
 def save_user_meal(user_id, meal_type, food, mysql_cursor):
@@ -58,3 +63,34 @@ def save_user_meal(user_id, meal_type, food, mysql_cursor):
 
     # Esegui l'operazione di aggiornamento nel database
     mysql_cursor.execute(sql_query, (food, user_id))
+
+
+def send_periodic_reminders(telegram_id, users, bot_telegram):
+    telegram_ids = get_all_telegram_ids(users)
+    for telegram_id in telegram_ids:
+        send_meal_reminder(telegram_id, "colazione", bot_telegram)
+        send_meal_reminder(telegram_id, "pranzo", bot_telegram)
+        send_meal_reminder(telegram_id, "cena", bot_telegram)
+    return telegram_id
+
+
+# Funzione che invia i messaggi di reminder all'utente.
+def send_meal_reminder(telegram_id, meal_type, bot_telegram):
+    if telegram_id is not None and isinstance(telegram_id, int) and telegram_id >= 0:
+        current_time = datetime.now().time()
+        if meal_type == "colazione" and time(7) <= current_time <= time(11, 0):
+            bot_telegram.send_message(telegram_id, "Buongiorno! Cosa hai mangiato a colazione?")
+        elif meal_type == "pranzo" and time(11) <= current_time <= time(15, 0):
+            bot_telegram.send_message(telegram_id, "Pranzo time! Cosa hai mangiato a pranzo?")
+        elif meal_type == "cena" and time(16, 0) <= current_time <= time(23, 0):
+            bot_telegram.send_message(telegram_id, "Cena! Cosa hai mangiato a cena?")
+    else:
+        print("Chat ID non valido:", telegram_id)
+
+
+# Funzione per eseguire le attività periodicamente
+@bot_telegram.message_handler(func=lambda message: True)
+def periodic_reminder(telegram_id, message, mysql_cursor_reminder, users_reminder, bot_telegram_reminder, event_reminder):
+    while not event_reminder.wait(60 * 60 * 24):  # Wait for 24 hours
+        send_periodic_reminders(users_reminder, bot_telegram_reminder, users_reminder)
+        handle_user_meal(telegram_id, message, mysql_cursor_reminder)
