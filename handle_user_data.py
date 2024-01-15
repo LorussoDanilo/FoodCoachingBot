@@ -20,7 +20,6 @@ def create_new_user(telegram_id, username):
 
 
 def update_user_profile(field_name, user_profile, response):
-
     # Definisci le associazioni tra le parole chiave della risposta e i campi del profilo utente
     update_profile_fields = {
         'telegram_id': 'telegram_id',
@@ -57,9 +56,8 @@ def get_user_profile(telegram_id):
         print(f"Error getting user profile: {e}")
 
 
-
-
-def get_all_telegram_ids(mysql_cursor):
+def get_all_telegram_ids():
+    mysql_connection, mysql_cursor = connect_mysql()
     # Query SQL per recuperare tutti gli ID di Telegram dalla tabella utenti
     mysql_cursor.execute("SELECT telegram_id FROM utenti")
     result = mysql_cursor.fetchall()
@@ -70,11 +68,9 @@ def get_all_telegram_ids(mysql_cursor):
 
 
 def ask_next_question_start(bot, questions_and_fields, telegram_id, index):
-
     if index > len(questions_and_fields):
         question, field = questions_and_fields[index]
         bot.send_message(telegram_id, question)
-
 
 
 # Update data Funzione per fare domande per l'aggiornamento delle informazioni

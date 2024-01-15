@@ -83,6 +83,7 @@ def create_tables(cursor):
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS dieta_settimanale (
           dieta_settimanale_id INT AUTO_INCREMENT PRIMARY KEY,
+          data DATE NOT NULL,
           telegram_id INT NOT NULL,
           FOREIGN KEY(telegram_id) REFERENCES utenti(telegram_id)
         );
@@ -132,11 +133,11 @@ def insert_data(cursor):
         """)
 
         cursor.execute("""
-        INSERT INTO dieta_settimanale (telegram_id)
-        VALUES
-          (1),
-          (2),
-          (3);
+            INSERT INTO dieta_settimanale (data, telegram_id)
+            VALUES
+              ('2024-01-15', 1),
+              ('2024-01-16', 2),
+              ('2024-01-17', 3);
         """)
 
         cursor.execute("""

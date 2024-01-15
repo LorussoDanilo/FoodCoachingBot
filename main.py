@@ -2,12 +2,14 @@ import logging
 import os
 import subprocess
 import threading
+import time
 import traceback
 
 import speech_recognition as sr
 from dotenv import load_dotenv
 
 from chatGPT_response import write_chatgpt
+from handle_reminder_response import periodic_reminder
 from handle_user_data import get_user_profile, create_new_user, ask_next_question, get_all_telegram_ids
 from utils.connection import connect, connect_mysql, call_create_tables_and_data_if_not_exists
 from utils.controls import control_tag
@@ -20,6 +22,8 @@ EDIT_COMMAND = 'modifica'
 
 # Connessione a MySQL
 mysql_connection, mysql_cursor = connect_mysql()
+# metodo per creare il database e le tabelle del database
+call_create_tables_and_data_if_not_exists()
 
 # Dizionario per tenere traccia dello stato dell'utente
 user_states = {}
@@ -49,7 +53,7 @@ if BOT_TOKEN is None:
 
 r = sr.Recognizer()
 
-users = get_all_telegram_ids(mysql_cursor)
+users = get_all_telegram_ids()
 
 LOG_FOLDER = '.logs'
 if not os.path.exists(LOG_FOLDER):
@@ -68,13 +72,9 @@ logging.getLogger('urllib3.connectionpool').setLevel('INFO')
 
 language = 'it-IT'
 
-# metodo per creare il database e le tabelle del database
-call_create_tables_and_data_if_not_exists()
+
 
 if __name__ == '__main__':
-
-
-
 
     @bot_telegram.message_handler(commands=[EDIT_COMMAND])
     def edit_command(message):
@@ -119,10 +119,6 @@ if __name__ == '__main__':
 
         print("post-start" + index.__str__())
 
-
-
-
-
     @bot_telegram.message_handler(content_types=['text', 'voice'])
     def handle_user_messages(message):
         global asking_questions, index, questions_and_fields  # Aggiungi questa riga
@@ -140,8 +136,11 @@ if __name__ == '__main__':
                 respost = write_chatgpt(openai, user_response, user_profile)
                 bot_telegram.send_message(message.chat.id, respost)
                 mysql_connection.close()
+
             elif message.content_type == 'voice':
                 voice_handler(message)
+
+
 
 
 @bot_telegram.message_handler(func=lambda message: True)
@@ -169,14 +168,15 @@ def handle_user_response(message):
             bot_telegram.send_message(telegram_id, question)
             index += 1
 
+
         print("post-handler" + index.__str__())
 
-    except Exception as e:
-        print(f"Errore durante la gestione della risposta: {e}")
+    except IndexError as e:
+        print(f"Ultima domanda raggiunta: {e}")
         event.clear()
         telegram_id = message.chat.id
         bot_telegram.send_message(telegram_id,
-                                  "Il tuo profilo è completo. Grazie! Ora puoi porre al chatbot una qualsiasi domanda")
+                                  "Il tuo profilo è completo. Grazie! Chiedimi ciò che desideri😊")
         mysql_connection.close()
 
 
@@ -211,6 +211,7 @@ def voice_recognizer():
     ffmpeg_path = 'C:\\Users\\Danilo Lorusso\\Desktop\\ffmpeg-master-latest-win64-gpl\\bin\\ffmpeg.exe'
     global r, language
 
+    #convertire un file audio da formato OGG a formato WAV
     subprocess.run([ffmpeg_path, '-i', 'audio.ogg', 'audio.wav', '-y'])
 
     audio_file_path = 'audio.wav'
