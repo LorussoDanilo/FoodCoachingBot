@@ -2,16 +2,12 @@ import time
 from datetime import datetime, time as dt_time
 
 from handle_user_data import get_all_telegram_ids
-from main import bot_telegram
 
 MEAL_TIMES = {
     "colazione": (dt_time(7, 0), dt_time(11, 0)),
     "pranzo": (dt_time(11, 0), dt_time(15, 0)),
-    "cena": (dt_time(16, 0), dt_time(23, 0)),
+    "cena": (dt_time(15, 10), dt_time(23, 0)),
 }
-
-
-
 
 
 def extract_meal_type(current_time):
@@ -21,7 +17,6 @@ def extract_meal_type(current_time):
     return ""
 
 
-@bot_telegram.message_handler(func=lambda message: True)
 def handle_user_meal(telegram_id, message_text, mysql_cursor):
     food = message_text.strip()
     current_time = datetime.now().time()
@@ -39,7 +34,8 @@ def save_user_meal(user_id, meal_type, food, mysql_cursor):
 
     sql_query = (
         "INSERT INTO utenti (telegram_id, weekly_diet_last_week, weekly_diet_counter) "
-        "VALUES (%s, %s, %s) ON DUPLICATE KEY UPDATE weekly_diet_last_week = %s, weekly_diet_counter = weekly_diet_counter + 1"
+        "VALUES (%s, %s, %s) ON DUPLICATE KEY UPDATE weekly_diet_last_week = %s,"
+        " weekly_diet_counter = weekly_diet_counter + 1"
     )
     mysql_cursor.execute(sql_query, (user_id, week_number, 1, week_number))
 

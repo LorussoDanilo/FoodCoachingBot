@@ -7,12 +7,10 @@ import mysql.connector
 import openai
 import telebot
 
-
 # constant
 TOKEN_CHAT_GPT = 'TOKEN_CHAT_GPT'
 TOKEN_TELEGRAM = 'TOKEN_TELEGRAM'
 FILE_XML = 'FILE_XML'
-
 
 
 def connect_mysql():
@@ -49,6 +47,7 @@ def connect_mysql():
     # Restituisci None se la connessione non è riuscita
     return None, None
 
+
 def check_database_existence(cursor, database_name):
     try:
         cursor.execute("SHOW DATABASES")
@@ -57,6 +56,7 @@ def check_database_existence(cursor, database_name):
     except Exception as e:
         print(f"Errore durante il controllo dell'esistenza del database: {e}")
         return False
+
 
 def create_database_if_not_exists(cursor, database_name):
     if not check_database_existence(cursor, database_name):
@@ -92,7 +92,8 @@ def create_tables(cursor):
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS giorno_settimana (
           giorno_settimana_id INT PRIMARY KEY,
-          nome VARCHAR(255) NOT NULL CHECK (nome IN ('Lunedi', 'Martedi', 'Mercoledi', 'Giovedi', 'Venerdi', 'Sabato', 'Domenica')),
+          nome VARCHAR(255) NOT NULL CHECK (nome IN ('Lunedi', 'Martedi', 'Mercoledi', 'Giovedi', 'Venerdi', 'Sabato', 
+          'Domenica')),
           dieta_settimanale_id INT NOT NULL,
           FOREIGN KEY(dieta_settimanale_id) REFERENCES dieta_settimanale(dieta_settimanale_id)
         );
@@ -197,7 +198,6 @@ def call_create_tables_and_data_if_not_exists():
         # Commit e chiudi la connessione
         connection.commit()
         connection.close()
-
 
 
 # Questa funzione serve per gestire le API e le risorse del progetto

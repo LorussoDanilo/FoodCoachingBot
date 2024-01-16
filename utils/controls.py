@@ -1,25 +1,23 @@
 # metodo per determinare se la domanda riguarda il cibo
-import re
+
 
 def is_food_question(question):
     # Aggiungi qui la tua logica per determinare se la domanda riguarda il cibo
     # Ad esempio, potresti usare delle parole chiave o espressioni regolari
     food_keywords = ["cibo", "pasto", "mangiare", "malattie", "disturbi", "nutrizionali", "ingredienti", "ingrediente",
-                     "cibo,", "nutrizione", "alimenti", "nutrienti", "dieta" , "proteine", "carboidrati", "grassi",
+                     "cibo,", "nutrizione", "alimenti", "nutrienti", "dieta", "proteine", "carboidrati", "grassi",
                      "fibre", "vitamine", "minerali", "calorie", "antiossidanti",
-                     "alimenti","biologico", "integrali","integrale", "pianta-based", "prodotti","vegetale",
+                     "alimenti", "biologico", "integrali", "integrale", "pianta-based", "prodotti", "vegetale",
                      "lattiero-caseari", "gluten-free", "vegetariano", "vegano", "peso corporeo", "diabete",
                      "colesterolo", "pressione sanguigna", "idratazione", "cibo sano",
                      "obesità", "diabete di tipo 2", "malattie cardiache", "iperlipidemia", "ipertensione",
                      "aterosclerosi", "celiachia", "intolleranze alimentari",
                      "allergie alimentari", "disturbi alimentari", "anoressia nervosa", "Bulimia nervosa", "sovrappeso",
                      "malnutrizione", "disturbi metabolici", "gotta", "osteoporosi", "anemia",
-                     "disturbi gastrointestinali", "reflusso gastroesofageo","reflusso",
+                     "disturbi gastrointestinali", "reflusso gastroesofageo", "reflusso",
                      "malattia del fegato grasso non alcolico", "sindrome metabolica",
                      "sindrome dell'intestino irritabile", "diarrea", "costipazione"]
     return any(keyword in question.lower() for keyword in food_keywords)
-
-
 
 
 # Decoratore per il controllo del testo in input
