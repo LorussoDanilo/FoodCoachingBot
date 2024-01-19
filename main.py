@@ -1,14 +1,17 @@
+import asyncio
 import threading
 import time
+import tracemalloc
+from datetime import datetime, time
 
 from dotenv import load_dotenv
 from mysql.connector import IntegrityError
 
 from chatGPT_response import write_chatgpt
-from handle_reminder_response import periodic_reminder
+from handle_reminder_data import save_user_food_response
 from handle_user_data import get_user_profile, create_new_user, ask_next_question, get_all_telegram_ids, \
     voice_recognizer, _clear
-from utils.connection import connect, connect_mysql, call_create_tables_and_data_if_not_exists
+from utils.connection import connect, connect_mysql, call_create_tables_if_not_exists
 from utils.controls import control_tag
 
 load_dotenv()
@@ -26,20 +29,17 @@ questions_and_fields = [
      'emozione')
 ]
 
-# variabile contenente tutti gli id telegram degli utenti registrati
-users = get_all_telegram_ids()
+# Periodo giorno
+meal_type = None
 
 # Connessione a MySQL
 mysql_connection, mysql_cursor = connect_mysql()
 
 # metodo per creare il database e le tabelle del database
-call_create_tables_and_data_if_not_exists()
+call_create_tables_if_not_exists()
 
 # Inizializzazione variabili per il bot telegram, api di chat gpt e del file xml con le informazioni
 openai, bot_telegram, root = connect()
-
-# variabile booleana per verificare se il thread è in esecuzione o meno
-periodic_thread_running = False
 
 # Variabile per gestire le funzionalità del chatbot. Serve per capire quando una funzionalità deve cominciare
 event = threading.Event()
@@ -47,25 +47,53 @@ event = threading.Event()
 # Indice delle domande
 index = 0
 
+# Crea una coda per gestire l'invio dei promemoria pasti
+reminder_queue = asyncio.Queue()
+tracemalloc.start()
 
-# Avvio del thread per inviare i reminders
-def send_periodic_reminders(message_id):
+
+# Invia i promemoria pasti in modo asincrono
+async def send_meal_reminder_loop(message):
+    global reminder_queue
+    await reminder_queue.put(message)
+    loop = asyncio.get_event_loop()
+    await loop.create_task(send_meal_reminder_async())
+    loop.run_forever()  # Utilizza asyncio.create_task per avviare la funzione asincrona
+
+
+# Thread per gestire l'invio dei promemoria pasti
+async def send_meal_reminder_async():
+    global meal_type, mysql_cursor, mysql_connection, reminder_queue
+
     while True:
-        message = bot_telegram.get_message(message_id)
-        telegram_id = message.chat.id
-        periodic_reminder(telegram_id, message, mysql_cursor, bot_telegram)
-        time.sleep(3600)
+        try:
+            message = await reminder_queue.get()  # Wait if the queue is empty
+            current_time = datetime.now().time()
+            telegram_ids = get_all_telegram_ids()
+            user_response = str(message.text)
 
+            for telegram_id in telegram_ids:
+                if time(7, 0) <= current_time <= time(11, 0):
+                    bot_telegram.send_message(telegram_id, "Buongiorno! Cosa hai mangiato a colazione?")
+                    meal_type = "colazione"
+                    save_user_food_response(bot_telegram, mysql_cursor, mysql_connection, telegram_id, meal_type,
+                                            user_response)
 
-# Metodo per gestire il message handler dei reminder
-def your_message_handler(message):
-    message_id = message.message_id
-    periodic_reminders_thread = threading.Thread(target=send_periodic_reminders, args=(message_id,))
-    periodic_reminders_thread.start()
+                elif current_time >= time(12, 0) and datetime.now().time() <= time(14, 0):
+                    bot_telegram.send_message(telegram_id, "Pranzo time! Cosa hai mangiato a pranzo?")
+                    meal_type = "pranzo"
+                    save_user_food_response(bot_telegram, mysql_cursor, mysql_connection, telegram_id, meal_type,
+                                            user_response)
+                elif current_time >= time(15, 0) and datetime.now().time() <= time(22, 0):
+                    bot_telegram.send_message(telegram_id, "Cena! Cosa hai mangiato a cena?")
+                    meal_type = "cena"
+                    save_user_food_response(bot_telegram, mysql_cursor, mysql_connection, telegram_id, meal_type,
+                                            user_response)
+                    await asyncio.sleep(60 * 60 * 24)  # Wait for 24 hours before sending the next reminder
 
+        except Exception as e:
+            print(f"Error during meal reminder sending: {e}")
 
-# Impostazione del gestore del messaggio
-bot_telegram.message_handler(func=your_message_handler)
 
 if __name__ == '__main__':
 
@@ -111,9 +139,9 @@ if __name__ == '__main__':
     @bot_telegram.message_handler(commands=[START_COMMAND])
     def send_welcome(message):
         # setto l'evento a true
-        event.set()
-        global questions_and_fields, index  # Dichiarazione di telegram_id come variabile globale
 
+        global questions_and_fields, index
+        event.set()
         telegram_id = message.chat.id
 
         user_profile_start = get_user_profile(telegram_id)
@@ -139,8 +167,8 @@ if __name__ == '__main__':
 
     # metodo per gestire i messaggi dell'utente dopo la profilazione. Sono gestiti sia i messaggi di testo che quelli
     # vocali
-    @bot_telegram.message_handler(content_types=['text', 'voice'])
-    def handle_user_messages(message):
+    @bot_telegram.message_handler(content_types=['text', 'voice'], )
+    def handle_messages_after_profile_questions(message):
         global index, questions_and_fields
         telegram_id = message.chat.id
 
@@ -148,24 +176,32 @@ if __name__ == '__main__':
         # passati a chatgpt.
         if event.is_set() and len(questions_and_fields) >= index:
             # Gestisci i nuovi messaggi degli utenti qui
-            handle_user_response(message)
+            handle_profile_response(message)
         else:
+            # Impostazione del gestore del messaggio
+            # Invia i promemoria pasti in modo asincrono
+            asyncio.run(send_meal_reminder_loop(message))
+            # Impostazione del gestore del messaggio
             if message.content_type == 'text':
-                event.clear()
                 user_response = str(message.text)
-                user_profile = get_user_profile(telegram_id)
-                print(user_profile)
-                respost = write_chatgpt(openai, user_response, user_profile)
-                bot_telegram.send_message(message.chat.id, respost)
-                mysql_connection.close()
+                asyncio.create_task(handle_user_response_after_reminder(user_response, telegram_id))
 
             elif message.content_type == 'voice':
                 voice_handler(message)
 
 
+# Metodo per gestire le risposte dell'utente dopo l'invio del promemoria pasto
+async def handle_user_response_after_reminder(user_response, telegram_id):
+    # Your subsequent code after the completion of send_meal_reminder_async
+    user_profile = get_user_profile(telegram_id)
+    print(user_profile)
+    respost = write_chatgpt(openai, user_response, user_profile)
+    bot_telegram.send_message(telegram_id, respost)
+
+
 # Metodo per gestire le risposte dell'utente alle domande della profilazione
 @bot_telegram.message_handler(func=lambda message: True)
-def handle_user_response(message):
+def handle_profile_response(message):
     global index, mysql_connection, mysql_cursor
     try:
         print("pre-handler" + index.__str__())
@@ -197,7 +233,9 @@ def handle_user_response(message):
         telegram_id = message.chat.id
         bot_telegram.send_message(telegram_id,
                                   "Il tuo profilo è completo. Grazie! Chiedimi ciò che desideri😊")
+        asyncio.run(send_meal_reminder_loop(message))
         mysql_connection.close()
+
     except Exception as e:
         print(f"Valore errato: {e}")
         telegram_id = message.chat.id
@@ -226,7 +264,6 @@ def voice_handler(message):
 
         # chiamare la funzione che permette di riconoscere la voce e convertire il file .ogg in .wav
         text = voice_recognizer()
-        event.clear()
 
         user_profile = get_user_profile(telegram_id)
         print(user_profile)
