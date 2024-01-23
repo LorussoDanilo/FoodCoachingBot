@@ -100,7 +100,7 @@ def ask_next_question(telegram_id, bot, questions_and_fields, index):
                                                                                                 index))
     else:
         # Se tutte le domande sono state fatte, comunica all'utente che i dati sono stati aggiornati
-        bot.send_message(telegram_id, "I tuoi dati sono stati aggiornati con successo!")
+        bot.send_message(telegram_id, "I tuoi dati sono stati aggiornati con successo! Puoi chiedermi ciò che desideri 😊")
 
     # Funzione per gestire la risposta dell'utente
     def handle_update_response(message, telegram_id_update, bot_update, questions_and_fields_update, index_update):
@@ -150,7 +150,7 @@ def voice_recognizer():
     # Set up the SpeechRecognition recognizer
     try:
         # Use recognize_sphinx instead of recognize_google
-        text = recognizer.recognize_google_cloud(audio, os.getenv("GOOGLE_APPLICATION_CREDENTIALS"), language=language)
+        text = recognizer.recognize_google_cloud(audio, os.getenv('GOOGLE_APPLICATION_CREDENTIALS'), language=language)
         print(text + ' recognizer')
 
     except sr.UnknownValueError:

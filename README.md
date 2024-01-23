@@ -6,7 +6,8 @@ Guida installazione:
 - Creare la venv (virtual environment) di python con il comando python *-m venv venv*
 - Spostarsi nella directory *\venv\Scripts* e digitare il comando *activate*
 - Scaricare lo zip da: https://github.com/BtbN/FFmpeg-Builds/releases. Questo programma è necessario per convertire i file audio da .ogg a .wav
-
+- Scaricare il file JSon delle credenziali di google cloud platform (nel .env inserire il path dove si trova questo file )
+- Generare la chiave per l'API di chatgpt
 
 Descrizione:
  - Chatbot telegram che ha lo scopo di fornire consigli dietetici
@@ -18,7 +19,7 @@ Modifica dati profilo:
 - L'utente può modificare i dati del proprio profilo attraverso il comando /modifica
 
 Modalità di interazione:
-- Testuale: l'utente può chiedere al chatbot qualsiasi domanda inerente al cibo. E' presente un filtro che consente di filtrare la conversazione cosi che il chatbot non risponda alle domande che non riguardano il cibo.
+- Testuale: l'utente può chiedere al chatbot qualsiasi domanda inerente al cibo.
 - Vocale: l'utente può comunicare anche tramite messaggi vocali
 
 Filtri conversazionali:

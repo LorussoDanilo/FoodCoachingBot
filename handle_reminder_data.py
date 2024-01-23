@@ -1,62 +1,76 @@
 import calendar
+import locale
 from datetime import datetime
+
+# Imposta la lingua italiana per il modulo locale
+locale.setlocale(locale.LC_TIME, 'it_IT')
+
 
 
 def get_or_insert_dieta_settimanale(cursor, telegram_id, date):
-    # Cerca se esiste già una riga per la data nella tabella dieta_settimanale
-    cursor.execute("SELECT dieta_settimanale_id FROM dieta_settimanale WHERE telegram_id = %s AND data = %s",
-                   (telegram_id, date))
-    dieta_settimanale_id = cursor.fetchone()
+    try:# Cerca se esiste già una riga per la data nella tabella dieta_settimanale
+        cursor.execute("SELECT dieta_settimanale_id FROM dieta_settimanale WHERE telegram_id = %s AND data = %s",
+                       (telegram_id, date))
+        dieta_settimanale_id = cursor.fetchone()
 
-    if dieta_settimanale_id:
-        # Se esiste già, restituisci l'ID
-        return dieta_settimanale_id[0]
-    else:
-        # Altrimenti, inserisci una nuova riga e restituisci il nuovo ID
-        cursor.execute("INSERT INTO dieta_settimanale (dieta_settimanale_id, telegram_id, data) VALUES (%s, %s, %s)",
-                       (0, telegram_id, date))
-        return cursor.fetchone()[0]
+        if dieta_settimanale_id:
+            # Se esiste già, restituisci l'ID
+            return dieta_settimanale_id[0]
+        else:
+            # Altrimenti, inserisci una nuova riga e restituisci il nuovo ID
+            cursor.execute("INSERT INTO dieta_settimanale (dieta_settimanale_id, telegram_id, data) VALUES (%s, %s, %s)",
+                           (0, telegram_id, date))
+            return cursor.fetchone()[0]
+    except Exception as e:
+        print(f"insert_dieta_settimanale: {e}")
+
 
 
 def get_or_insert_giorno_settimana(cursor, dieta_settimanale_id, weekday_name):
-    # Cerca se esiste già una riga per il giorno nella tabella giorno_settimana
-    cursor.execute("SELECT giorno_settimana_id FROM giorno_settimana WHERE dieta_settimanale_id = %s AND nome = %s",
-                   (dieta_settimanale_id, weekday_name))
-    giorno_settimana_id = cursor.fetchone()
-
-    if giorno_settimana_id:
-        # Se esiste già, restituisci l'ID
-        return giorno_settimana_id[0]
-    else:
-        # Altrimenti, inserisci una nuova riga e restituisci il nuovo ID
-        cursor.execute("INSERT INTO giorno_settimana (dieta_settimanale_id, nome) VALUES (%s, %s)",
+    try:
+        # Cerca se esiste già una riga per il giorno nella tabella giorno_settimana
+        cursor.execute("SELECT giorno_settimana_id FROM giorno_settimana WHERE dieta_settimanale_id = %s AND nome = %s",
                        (dieta_settimanale_id, weekday_name))
-        cursor.execute("SELECT LAST_INSERT_ID()")  # Ottieni l'ID dell'ultima riga inserita
-        return cursor.fetchone()[0]
+        giorno_settimana_id = cursor.fetchone()
+
+        if giorno_settimana_id:
+            # Se esiste già, restituisci l'ID
+            return giorno_settimana_id[0]
+        else:
+            # Altrimenti, inserisci una nuova riga e restituisci il nuovo ID
+            cursor.execute("INSERT INTO giorno_settimana (dieta_settimanale_id, nome) VALUES (%s, %s)",
+                           (dieta_settimanale_id, weekday_name))
+            cursor.execute("SELECT LAST_INSERT_ID()")  # Ottieni l'ID dell'ultima riga inserita
+            return cursor.fetchone()[0]
+    except Exception as e:
+        print(f"insert_giorno settimana: {e}")
+
 
 
 def get_or_insert_periodo_giorno(cursor, giorno_settimana_id, meal_type):
-    # Cerca se esiste già una riga per il periodo_giorno nella tabella periodo_giorno
-    cursor.execute("SELECT periodo_giorno_id FROM periodo_giorno WHERE nome = %s AND giorno_settimana_id = %s",
-                   (meal_type, giorno_settimana_id))
-    periodo_giorno_id = cursor.fetchone()
-
-    if periodo_giorno_id:
-        # Se esiste già, restituisci l'ID
-        return periodo_giorno_id[0]
-    else:
-        # Altrimenti, inserisci una nuova riga e restituisci il nuovo ID
-        cursor.execute("INSERT INTO periodo_giorno (nome, giorno_settimana_id) VALUES (%s, %s)",
+    try:
+        # Cerca se esiste già una riga per il periodo_giorno nella tabella periodo_giorno
+        cursor.execute("SELECT periodo_giorno_id FROM periodo_giorno WHERE nome = %s AND giorno_settimana_id = %s",
                        (meal_type, giorno_settimana_id))
-        cursor.execute("SELECT LAST_INSERT_ID()")  # Ottieni l'ID dell'ultima riga inserita
-        return cursor.fetchone()[0]
+        periodo_giorno_id = cursor.fetchone()
+
+        if periodo_giorno_id:
+            # Se esiste già, restituisci l'ID
+            return periodo_giorno_id[0]
+        else:
+            # Altrimenti, inserisci una nuova riga e restituisci il nuovo ID
+            cursor.execute("INSERT INTO periodo_giorno (nome, giorno_settimana_id) VALUES (%s, %s)",
+                           (meal_type, giorno_settimana_id))
+            cursor.execute("SELECT LAST_INSERT_ID()")  # Ottieni l'ID dell'ultima riga inserita
+            return cursor.fetchone()[0]
+    except Exception as e:
+        print(f"insert_periodo_giorno: {e}")
 
 
 # Funzione per gestire la risposta del pasto
 def save_user_food_response(bot_telegram, mysql_cursor, mysql_connection, telegram_id, meal_type, food_name):
 
     try:
-        datetime.now().time()
         date = datetime.now().date()
 
         # Ottieni o inserisci l'ID della riga nella tabella dieta_settimanale
@@ -78,7 +92,67 @@ def save_user_food_response(bot_telegram, mysql_cursor, mysql_connection, telegr
         # Esegui il commit delle modifiche al database
         mysql_connection.commit()
 
-        return bot_telegram.send_message(telegram_id, f"{meal_type} inserito/a correttamente!")
+        return bot_telegram.send_message(telegram_id,
+                                         f"{meal_type} inserito/a correttamente! Ora puoi chiedermi ciò che desideri 😊")
 
     except Exception as e:
         print(f"Errore durante l'inserimento del cibo: {e}")
+
+
+def get_food_for_day(telegram_id, dieta_data, nome_giorno, cursor):
+    # Ottieni l'ID della dieta settimanale per la data specificata
+    cursor.execute("SELECT dieta_settimanale_id FROM dieta_settimanale WHERE telegram_id = ? AND data = ?",
+                   (telegram_id, dieta_data))
+    result = cursor.fetchone()
+
+    if result is None:
+        # Nessuna dieta trovata per la data specificata
+        return []
+
+    dieta_settimanale_id = result[0]
+
+    # Ottieni l'ID del giorno della settimana
+    cursor.execute("SELECT giorno_settimana_id FROM giorno_settimana WHERE nome = ? AND dieta_settimanale_id = ?",
+                   (nome_giorno, dieta_settimanale_id))
+    result = cursor.fetchone()
+
+    if result is None:
+        # Nessun giorno della settimana trovato con il nome specificato
+        return []
+
+    giorno_settimana_id = result[0]
+
+    # Ottieni i cibi per il giorno specificato
+    cursor.execute("""
+        SELECT cibo.nome, cibo.calorie
+        FROM cibo
+        INNER JOIN periodo_giorno ON cibo.periodo_giorno_id = periodo_giorno.periodo_giorno_id
+        WHERE periodo_giorno.giorno_settimana_id = ?
+    """, (giorno_settimana_id,))
+
+    cibi_giorno = []
+    for row in cursor.fetchall():
+        cibo = {'nome': row[0], 'calorie': row[1]}
+        cibi_giorno.append(cibo)
+
+    return cibi_giorno
+
+
+def get_dieta_dates_by_telegram_id(telegram_id, mysql_cursor):
+    try:
+        # Esegui la query per ottenere le date della dieta per un determinato utente
+        mysql_cursor.execute("SELECT DISTINCT data FROM dieta_settimanale WHERE telegram_id = %s", (telegram_id,))
+
+        # Recupera i risultati della query
+        result = mysql_cursor.fetchall()
+
+        # Restituisci le date delle diete
+        dieta_dates = [row[0] for row in result]
+        return dieta_dates
+
+    except Exception as e:
+        # Gestisci eventuali eccezioni
+        print(f"Errore durante l'ottenimento delle date della dieta: {e}")
+        return []
+
+
