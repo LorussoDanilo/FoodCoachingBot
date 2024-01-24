@@ -1,16 +1,17 @@
-import asyncio
 import io
 import locale
 import os
+import tempfile
 import threading
-import tracemalloc
 from datetime import datetime, time
 
 import pandas as pd
+import requests
 from dotenv import load_dotenv
 from matplotlib import pyplot as plt
 from mysql.connector import IntegrityError, errorcode
 from reportlab.pdfgen import canvas
+from roboflow import Roboflow
 from telebot.types import InputFile
 
 from chatGPT_response import write_chatgpt
@@ -63,8 +64,6 @@ ORA_CENA_START = time(16, 0)
 ORA_CENA_END = time(23, 50)
 
 
-
-
 def check_time_in_range(current_time, start_time, end_time):
     return start_time <= current_time <= end_time
 
@@ -85,6 +84,7 @@ def send_message_reminder():
         for telegram_id in telegram_ids:
             bot_telegram.send_message(telegram_id, "Cena! Cosa hai mangiato a cena?")
             event.wait(10)
+
 
 reminder_message_thread = threading.Thread(target=send_message_reminder, daemon=True)
 
@@ -128,8 +128,6 @@ def send_reminder(message):
 
 
 if __name__ == '__main__':
-
-
 
     @bot_telegram.message_handler(commands=[DASHBOARD_COMMAND])
     def generate_all_weekly_diets_pdf(message):
@@ -294,7 +292,7 @@ if __name__ == '__main__':
 
 
     # Metodo per gestire le risposte dell'utente alle domande della profilazione
-    @bot_telegram.message_handler(func=lambda message: True, content_types=['text', 'voice'])
+    @bot_telegram.message_handler(func=lambda message: True, content_types=['text', 'voice', 'photo'])
     def handle_profile_response(message):
         global mysql_connection, mysql_cursor, event, index, reminder_message_thread
         user_response = str(message.text)
@@ -325,10 +323,14 @@ if __name__ == '__main__':
                 bot_telegram.send_message(telegram_id,
                                           "Il tuo profilo è completo. Grazie! Chiedimi ciò che desideri😊")
                 index += 1
+            elif message.content_type == 'photo':
+                # Estrai il file_id della foto, prendendo l'ultima foto inviata
+                # Passa il dizionario simulato alla funzione
+                photo_handler(message)
+
 
 
             elif index > len(questions_and_fields):
-
 
                 if event.is_set():
 
@@ -350,10 +352,12 @@ if __name__ == '__main__':
 
                         user_profile = get_user_profile(telegram_id)
                         print(user_profile)
-                        respost = write_chatgpt(openai, user_response, user_profile)
+                        respost = write_chatgpt(openai, user_response, user_profile, mysql_cursor,telegram_id)
                         bot_telegram.send_message(telegram_id, respost)
                     elif message.content_type == 'voice':
                         voice_handler(message)
+                    elif message.content_type == 'photo':
+                        photo_handler(message)
 
         except Exception as e:
             print(f"Valore errato: {e}")
@@ -395,11 +399,72 @@ def voice_handler(message):
 
         user_profile = get_user_profile(telegram_id)
         print(user_profile)
-        respost = write_chatgpt(openai, text, user_profile)
+        respost = write_chatgpt(openai, text, user_profile, mysql_cursor,telegram_id)
         bot_telegram.send_message(message.chat.id, respost)
         # chiamare il metodo per cancellare i file .ogg e .wav generati
         _clear()
 
+
+@bot_telegram.message_handler(func=lambda message: True)
+def photo_handler(message):
+    print("oddio")
+    telegram_id = message.chat.id
+    # Esegui il riconoscimento del cibo
+
+    photo_result = photo_recognizer(message)
+    if message.caption:
+        results = photo_result + message.caption
+        user_profile = get_user_profile(telegram_id)
+        print(results)
+        respost = write_chatgpt(openai, results, user_profile, mysql_cursor, telegram_id)
+        bot_telegram.send_message(telegram_id, respost)
+    else:
+        results = photo_result
+        user_profile = get_user_profile(telegram_id)
+        print(results)
+        respost = write_chatgpt(openai, results, user_profile, mysql_cursor, telegram_id)
+        bot_telegram.send_message(telegram_id, respost)
+
+
+def photo_recognizer(message):
+    try:
+        # Ottieni l'oggetto PhotoSize con la foto di dimensioni più grandi
+        photo = message.photo[-1]
+        bot_token = os.getenv('TOKEN_TELEGRAM')
+        telegram_id = message.chat.id
+
+        # Ottieni l'oggetto File corrispondente all'oggetto PhotoSize
+        file_info = bot_telegram.get_file(photo.file_id)
+
+        # Costruisci l'URL dell'immagine
+        image_url = f'https://api.telegram.org/file/bot{bot_token}/{file_info.file_path}'
+
+        # Salva temporaneamente l'immagine su disco
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as temp_file:
+            temp_file.write(requests.get(image_url).content)
+            temp_file.close()  # Chiudi il file dopo aver scritto
+
+            rf = Roboflow(api_key="DdgoW5JHoOafvCdYGtUE")
+            project = rf.workspace().project("merge-wrowm")
+            model = project.version(2).model
+            result = model.predict(temp_file.name, confidence=40, overlap=30)
+            # Esegui l'inferenza utilizzando il percorso temporaneo del file
+            if result:
+                print(result.json())
+                # Rimuovi il file temporaneo
+                os.remove(temp_file.name)
+                predictions = result.json().get("predictions", [])
+                recognized_class = predictions[0]["class"]
+                print(recognized_class)
+                return recognized_class
+            else:
+                os.remove(temp_file.name)
+                return bot_telegram.send_message(telegram_id, "Foto non riconosciuta. Riprovare!")
+
+
+    except Exception as e:
+        print(f"Error in photo_recognizer: {e}")
+        bot_telegram.reply_to(message, "Si è verificato un errore durante il riconoscimento dell'immagine.")
 
 # Esegui il polling infinito del bot Telegram
 bot_telegram.infinity_polling()

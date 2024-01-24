@@ -6,23 +6,33 @@ from datetime import datetime
 locale.setlocale(locale.LC_TIME, 'it_IT')
 
 
-
 def get_or_insert_dieta_settimanale(cursor, telegram_id, date):
-    try:# Cerca se esiste già una riga per la data nella tabella dieta_settimanale
-        cursor.execute("SELECT dieta_settimanale_id FROM dieta_settimanale WHERE telegram_id = %s AND data = %s",
-                       (telegram_id, date))
-        dieta_settimanale_id = cursor.fetchone()
+    try:
+        # Cerca se esiste già una riga per la data o la data successiva nella tabella dieta_settimanale
+        cursor.execute(
+            "SELECT dieta_settimanale_id FROM dieta_settimanale WHERE telegram_id = %s AND (data = %s OR data = DATE_ADD(%s, INTERVAL 1 DAY))",
+            (telegram_id, date, date))
+        existing_row = cursor.fetchone()
 
-        if dieta_settimanale_id:
+        if existing_row:
             # Se esiste già, restituisci l'ID
-            return dieta_settimanale_id[0]
+            return existing_row[0]
         else:
-            # Altrimenti, inserisci una nuova riga e restituisci il nuovo ID
-            cursor.execute("INSERT INTO dieta_settimanale (dieta_settimanale_id, telegram_id, data) VALUES (%s, %s, %s)",
-                           (0, telegram_id, date))
-            return cursor.fetchone()[0]
+            # Ottieni l'indice massimo attuale per l'utente
+            cursor.execute("SELECT MAX(dieta_settimanale_id) FROM dieta_settimanale WHERE telegram_id = %s", (telegram_id,))
+            max_dieta_settimanale_id = cursor.fetchone()[0]
+
+            # Incrementa l'indice
+            new_dieta_settimanale_id = max_dieta_settimanale_id + 1 if max_dieta_settimanale_id is not None else 1
+
+            # Inserisci una nuova riga con l'indice incrementato
+            cursor.execute(
+                "INSERT INTO dieta_settimanale (dieta_settimanale_id, telegram_id, data) VALUES (%s, %s, %s)",
+                (new_dieta_settimanale_id, telegram_id, date))
+
+            return new_dieta_settimanale_id
     except Exception as e:
-        print(f"insert_dieta_settimanale: {e}")
+        print(f"get_or_insert_dieta_settimanale: {e}")
 
 
 
