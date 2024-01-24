@@ -1,9 +1,12 @@
 import io
 import locale
 import os
+import pickle
 import tempfile
 import threading
+import time as trem
 from datetime import datetime, time
+from queue import Queue
 
 import pandas as pd
 import requests
@@ -63,68 +66,11 @@ ORA_PRANZO_END = time(15, 0)
 ORA_CENA_START = time(16, 0)
 ORA_CENA_END = time(23, 50)
 
+queue = Queue()
+
 
 def check_time_in_range(current_time, start_time, end_time):
     return start_time <= current_time <= end_time
-
-
-def send_message_reminder():
-    telegram_ids = get_all_telegram_ids()
-    current_time_reminder = datetime.now().time()
-    if check_time_in_range(current_time_reminder, ORA_COLAZIONE_START, ORA_COLAZIONE_END):
-        for telegram_id in telegram_ids:
-            bot_telegram.send_message(telegram_id, "Buongiorno! Cosa hai mangiato a colazione?")
-            event.wait(10)
-    elif check_time_in_range(current_time_reminder, ORA_PRANZO_START, ORA_PRANZO_END):
-        for telegram_id in telegram_ids:
-            bot_telegram.send_message(telegram_id, "Pranzo time! Cosa hai mangiato a pranzo?")
-            event.wait(10)
-
-    elif check_time_in_range(current_time_reminder, ORA_CENA_START, ORA_CENA_END):
-        for telegram_id in telegram_ids:
-            bot_telegram.send_message(telegram_id, "Cena! Cosa hai mangiato a cena?")
-            event.wait(10)
-
-
-reminder_message_thread = threading.Thread(target=send_message_reminder, daemon=True)
-
-
-def send_reminder(message):
-    global meal_type, mysql_cursor, mysql_connection
-    telegram_ids = get_all_telegram_ids()
-    user_response = str(message.text)
-    current_time_reminder = datetime.now().time()
-    try:
-
-        if check_time_in_range(current_time_reminder, ORA_COLAZIONE_START, ORA_COLAZIONE_END):
-            for telegram_id in telegram_ids:
-                meal_type = "colazione"
-                save_user_food_response(bot_telegram, mysql_cursor, mysql_connection, telegram_id, meal_type,
-                                        user_response)
-                event.clear()
-                event.wait(10)
-                event.set()
-        elif check_time_in_range(current_time_reminder, ORA_PRANZO_START, ORA_PRANZO_END):
-            for telegram_id in telegram_ids:
-                meal_type = "pranzo"
-                save_user_food_response(bot_telegram, mysql_cursor, mysql_connection, telegram_id, meal_type,
-                                        user_response)
-                event.clear()
-                event.wait(10)
-                event.set()
-
-        elif check_time_in_range(current_time_reminder, ORA_CENA_START, ORA_CENA_END):
-            for telegram_id in telegram_ids:
-                meal_type = "cena"
-                save_user_food_response(bot_telegram, mysql_cursor, mysql_connection, telegram_id, meal_type,
-                                        user_response)
-                event.clear()
-                event.wait(10)
-                event.set()
-
-    except Exception as main_exception:
-        # Handle the main exception (e.g., log the error)
-        print(f"Main exception occurred: {main_exception}")
 
 
 if __name__ == '__main__':
@@ -297,6 +243,8 @@ if __name__ == '__main__':
         global mysql_connection, mysql_cursor, event, index, reminder_message_thread
         user_response = str(message.text)
         telegram_id = message.chat.id
+        telegram_ids = get_all_telegram_ids()
+        current_time_reminder = datetime.now().time()
 
         try:
             if index < len(questions_and_fields):
@@ -323,36 +271,36 @@ if __name__ == '__main__':
                 bot_telegram.send_message(telegram_id,
                                           "Il tuo profilo è completo. Grazie! Chiedimi ciò che desideri😊")
                 index += 1
-            elif message.content_type == 'photo':
-                # Estrai il file_id della foto, prendendo l'ultima foto inviata
-                # Passa il dizionario simulato alla funzione
-                photo_handler(message)
+
+                for telegram_id in telegram_ids:
+                    if check_time_in_range(current_time_reminder, ORA_COLAZIONE_START, ORA_COLAZIONE_END):
+                        bot_telegram.send_message(telegram_id, "Buongiorno! Cosa hai mangiato a colazione?")
+
+                    elif check_time_in_range(current_time_reminder, ORA_PRANZO_START, ORA_PRANZO_END):
+                        bot_telegram.send_message(telegram_id, "Pranzo time! Cosa hai mangiato a pranzo?")
+
+                    elif check_time_in_range(current_time_reminder, ORA_CENA_START, ORA_CENA_END):
+                        bot_telegram.send_message(telegram_id, "Cena! Cosa hai mangiato a cena?")
+                    else:
+                        event.clear()
 
 
 
             elif index > len(questions_and_fields):
-
                 if event.is_set():
+                    reminder_message_thread = threading.Thread(target=send_reminder_message, daemon=True)
+                    reminder_message_thread.start()
+                    reminder_thread = threading.Thread(target=send_reminder, daemon=True, args=(message,))
+                    reminder_thread.start()
 
-                    current_time_reminder = datetime.now().time()
-                    if (check_time_in_range(current_time_reminder, ORA_COLAZIONE_START, ORA_COLAZIONE_END) or
-                            check_time_in_range(current_time_reminder, ORA_PRANZO_START, ORA_PRANZO_END) or
-                            check_time_in_range(current_time_reminder, ORA_CENA_START, ORA_CENA_END)):
 
-                        reminder_message_thread = threading.Thread(target=send_message_reminder, daemon=True)
-                        reminder_message_thread.start()
-
-                        reminder_thread = threading.Thread(target=send_reminder, daemon=True, args=(message,))
-                        reminder_thread.start()
-                    else:
-                        event.clear()
 
                 else:
                     if message.content_type == 'text':
 
                         user_profile = get_user_profile(telegram_id)
                         print(user_profile)
-                        respost = write_chatgpt(openai, user_response, user_profile, mysql_cursor,telegram_id)
+                        respost = write_chatgpt(openai, user_response, user_profile, mysql_cursor, telegram_id)
                         bot_telegram.send_message(telegram_id, respost)
                     elif message.content_type == 'voice':
                         voice_handler(message)
@@ -379,6 +327,69 @@ if __name__ == '__main__':
                 bot_telegram.send_message(telegram_id, f"Errore del database: {db_error}")
 
 
+@bot_telegram.message_handler(func=lambda message: True)
+def send_reminder(message):
+    global meal_type, mysql_cursor, mysql_connection, queue
+
+    serialized_message = pickle.dumps(message)
+    queue.put(serialized_message)
+
+    telegram_ids = get_all_telegram_ids()
+    deserialized_message = pickle.loads(serialized_message)
+    user_response = str(deserialized_message.text)
+    current_time_reminder = datetime.now().time()
+    try:
+
+        if check_time_in_range(current_time_reminder, ORA_COLAZIONE_START, ORA_COLAZIONE_END):
+            for telegram_id in telegram_ids:
+                meal_type = "colazione"
+                save_user_food_response(bot_telegram, mysql_cursor, mysql_connection, telegram_id, meal_type,
+                                        user_response)
+                event.clear()
+                event.wait(10)
+                event.set()
+        elif check_time_in_range(current_time_reminder, ORA_PRANZO_START, ORA_PRANZO_END):
+            for telegram_id in telegram_ids:
+                meal_type = "pranzo"
+                save_user_food_response(bot_telegram, mysql_cursor, mysql_connection, telegram_id, meal_type,
+                                        user_response)
+                event.clear()
+                event.wait(10)
+                event.set()
+
+        elif check_time_in_range(current_time_reminder, ORA_CENA_START, ORA_CENA_END):
+            for telegram_id in telegram_ids:
+                meal_type = "cena"
+                save_user_food_response(bot_telegram, mysql_cursor, mysql_connection, telegram_id, meal_type,
+                                        user_response)
+                event.clear()
+                event.wait(10)
+                event.set()
+
+    except Exception as main_exception:
+        # Handle the main exception (e.g., log the error)
+        print(f"Main exception occurred: {main_exception}")
+
+
+# chat_id checks id corresponds to your list or not.
+def send_reminder_message():
+    telegram_ids = get_all_telegram_ids()
+
+    current_time_reminder = datetime.now().time()
+    # Serializzazione dell'oggetto Message
+
+    while event.is_set():
+        for telegram_id in telegram_ids:
+            if check_time_in_range(current_time_reminder, ORA_COLAZIONE_START, ORA_COLAZIONE_END):
+                bot_telegram.send_message(telegram_id, "Buongiorno! Cosa hai mangiato a colazione?", trem.sleep(10))
+
+            elif check_time_in_range(current_time_reminder, ORA_PRANZO_START, ORA_PRANZO_END):
+                bot_telegram.send_message(telegram_id, "Pranzo time! Cosa hai mangiato a pranzo?", trem.sleep(10))
+
+            elif check_time_in_range(current_time_reminder, ORA_CENA_START, ORA_CENA_END):
+                bot_telegram.send_message(telegram_id, "Cena! Cosa hai mangiato a cena?", trem.sleep(10))
+
+
 # Metodo per gestire i messaggi vocali dell'utente
 @bot_telegram.message_handler(func=lambda message: True)
 def voice_handler(message):
@@ -399,7 +410,7 @@ def voice_handler(message):
 
         user_profile = get_user_profile(telegram_id)
         print(user_profile)
-        respost = write_chatgpt(openai, text, user_profile, mysql_cursor,telegram_id)
+        respost = write_chatgpt(openai, text, user_profile, mysql_cursor, telegram_id)
         bot_telegram.send_message(message.chat.id, respost)
         # chiamare il metodo per cancellare i file .ogg e .wav generati
         _clear()
@@ -465,6 +476,7 @@ def photo_recognizer(message):
     except Exception as e:
         print(f"Error in photo_recognizer: {e}")
         bot_telegram.reply_to(message, "Si è verificato un errore durante il riconoscimento dell'immagine.")
+
 
 # Esegui il polling infinito del bot Telegram
 bot_telegram.infinity_polling()
