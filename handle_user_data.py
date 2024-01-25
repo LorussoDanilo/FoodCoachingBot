@@ -1,3 +1,4 @@
+import locale
 import os
 
 from utils.connection import connect_mysql
@@ -7,7 +8,7 @@ import speech_recognition as sr
 import logging
 
 handle_user_response_gpt_enabled = False
-
+locale.setlocale(locale.LC_TIME, 'it_IT')
 # if per creare la directory dei logs
 LOG_FOLDER = '.logs'
 if not os.path.exists(LOG_FOLDER):

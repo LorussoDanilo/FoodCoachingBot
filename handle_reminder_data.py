@@ -1,6 +1,6 @@
 import calendar
 import locale
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # Imposta la lingua italiana per il modulo locale
 locale.setlocale(locale.LC_TIME, 'it_IT')
@@ -10,7 +10,7 @@ def get_or_insert_dieta_settimanale(cursor, telegram_id, date):
     try:
         # Cerca se esiste già una riga per la data o la data successiva nella tabella dieta_settimanale
         cursor.execute(
-            "SELECT dieta_settimanale_id FROM dieta_settimanale WHERE telegram_id = %s AND (data = %s OR data = DATE_ADD(%s, INTERVAL 1 DAY))",
+            "SELECT dieta_settimanale_id, data FROM dieta_settimanale WHERE telegram_id = %s AND (data = %s OR data = DATE_ADD(%s, INTERVAL 1 DAY))",
             (telegram_id, date, date))
         existing_row = cursor.fetchone()
 
@@ -22,8 +22,24 @@ def get_or_insert_dieta_settimanale(cursor, telegram_id, date):
             cursor.execute("SELECT MAX(dieta_settimanale_id) FROM dieta_settimanale WHERE telegram_id = %s", (telegram_id,))
             max_dieta_settimanale_id = cursor.fetchone()[0]
 
-            # Incrementa l'indice
-            new_dieta_settimanale_id = max_dieta_settimanale_id + 1 if max_dieta_settimanale_id is not None else 1
+            # Ottieni la data della dieta settimanale precedente (se esiste)
+            if max_dieta_settimanale_id is not None:
+                cursor.execute("SELECT data FROM dieta_settimanale WHERE telegram_id = %s AND dieta_settimanale_id = %s",
+                               (telegram_id, max_dieta_settimanale_id))
+                last_week_date = cursor.fetchone()
+
+                if last_week_date:
+                    # Calcola la data successiva
+                    next_week_date = last_week_date[0] + timedelta(days=7)
+                    # Se la data attuale è successiva alla data della settimana precedente, incrementa l'ID
+                    if date >= next_week_date:
+                        new_dieta_settimanale_id = max_dieta_settimanale_id + 1
+                    else:
+                        new_dieta_settimanale_id = max_dieta_settimanale_id
+                else:
+                    new_dieta_settimanale_id = max_dieta_settimanale_id + 1
+            else:
+                new_dieta_settimanale_id = 1
 
             # Inserisci una nuova riga con l'indice incrementato
             cursor.execute(
@@ -40,7 +56,7 @@ def get_or_insert_giorno_settimana(cursor, dieta_settimanale_id, weekday_name):
     try:
         # Cerca se esiste già una riga per il giorno nella tabella giorno_settimana
         cursor.execute("SELECT giorno_settimana_id FROM giorno_settimana WHERE dieta_settimanale_id = %s AND nome = %s",
-                       (dieta_settimanale_id, weekday_name))
+                       (weekday_name, dieta_settimanale_id))
         giorno_settimana_id = cursor.fetchone()
 
         if giorno_settimana_id:
@@ -48,13 +64,12 @@ def get_or_insert_giorno_settimana(cursor, dieta_settimanale_id, weekday_name):
             return giorno_settimana_id[0]
         else:
             # Altrimenti, inserisci una nuova riga e restituisci il nuovo ID
-            cursor.execute("INSERT INTO giorno_settimana (dieta_settimanale_id, nome) VALUES (%s, %s)",
-                           (dieta_settimanale_id, weekday_name))
+            cursor.execute("INSERT INTO giorno_settimana (nome, dieta_settimanale_id) VALUES (%s, %s)",
+                           (weekday_name, dieta_settimanale_id))
             cursor.execute("SELECT LAST_INSERT_ID()")  # Ottieni l'ID dell'ultima riga inserita
             return cursor.fetchone()[0]
     except Exception as e:
         print(f"insert_giorno settimana: {e}")
-
 
 
 def get_or_insert_periodo_giorno(cursor, giorno_settimana_id, meal_type):
@@ -79,7 +94,6 @@ def get_or_insert_periodo_giorno(cursor, giorno_settimana_id, meal_type):
 
 # Funzione per gestire la risposta del pasto
 def save_user_food_response(bot_telegram, mysql_cursor, mysql_connection, telegram_id, meal_type, food_name):
-
     try:
         date = datetime.now().date()
 
@@ -164,5 +178,3 @@ def get_dieta_dates_by_telegram_id(telegram_id, mysql_cursor):
         # Gestisci eventuali eccezioni
         print(f"Errore durante l'ottenimento delle date della dieta: {e}")
         return []
-
-

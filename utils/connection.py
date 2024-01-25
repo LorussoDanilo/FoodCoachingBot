@@ -1,4 +1,5 @@
 # Function to connect to MongoDB
+import locale
 import os
 import xml.etree.ElementTree as et
 
@@ -11,6 +12,8 @@ import telebot
 TOKEN_CHAT_GPT = 'TOKEN_CHAT_GPT'
 TOKEN_TELEGRAM = 'TOKEN_TELEGRAM'
 FILE_XML = 'FILE_XML'
+
+locale.setlocale(locale.LC_TIME, 'it_IT')
 
 
 def connect_mysql():
@@ -82,7 +85,7 @@ def create_tables(cursor):
 
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS dieta_settimanale (
-          dieta_settimanale_id INT PRIMARY KEY,
+          dieta_settimanale_id INT AUTO_INCREMENT PRIMARY KEY,
           data DATE NOT NULL,
           telegram_id INT NOT NULL,
           FOREIGN KEY(telegram_id) REFERENCES utenti(telegram_id)

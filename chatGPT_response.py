@@ -1,6 +1,8 @@
+import locale
+
 from utils.controls import is_food_question
 
-
+locale.setlocale(locale.LC_TIME, 'it_IT')
 def write_chatgpt(openai, message, profilo_utente, mysql_cursor, telegram_id):
     dieta_settimanale_text = ""
     try:
@@ -20,7 +22,7 @@ def write_chatgpt(openai, message, profilo_utente, mysql_cursor, telegram_id):
 
         # Aggiungi le informazioni del profilo e della dieta settimanale al messaggio di input per ChatGPT
         input_con_profilo_e_dieta = (
-            f"La mia età è: {eta} | I miei disturbi o malattie sono: {', '.join(malattie)} | Io quando mangio o penso al "
+            f"La mia età è: {eta} | La mia malattia o disturbo è: {', '.join(malattie)} | Io quando mangio o penso al "
             f"cibo provo un sentimento: {emozione}"f" | {dieta_settimanale_text}\n"
             f" | Mettiti nei panni di un nutrizionista,tieni conto di queste informazioni e adatta il tuo linguaggio "
             f"considerando che provo {emozione} quando mangio o penso al cibo, prima di rispondere alla seguente "
