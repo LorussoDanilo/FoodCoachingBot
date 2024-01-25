@@ -44,9 +44,10 @@ def correct_text_xml(function):
     gestendo il caso in cui una riga è vuota, e sostituendo _bn_ con un carattere di nuova riga.
 
     :param function: Prende come argomento una funzione (function). Il suo scopo principale è eseguire delle operazioni aggiuntive sul testo in input.
+    :type function:
 
     :return: restituisce una nuova funzione (wrapper)
-
+    :rtype: LiteralString
     """
 
     # Prende una stringa (item), rimuove gli spazi bianchi iniziali tramite item.lstrip(), e restituisce None se la

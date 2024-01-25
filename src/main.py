@@ -61,10 +61,10 @@ event = threading.Event()
 index = 0
 
 # Inizializzazione degli intervalli orari per inviare i reminder
-ORA_COLAZIONE_START = time(7, 0)
-ORA_COLAZIONE_END = time(11, 0)
-ORA_PRANZO_START = time(11, 51, 10)
-ORA_PRANZO_END = time(15, 0)
+ORA_COLAZIONE_START = time(8, 0)
+ORA_COLAZIONE_END = time(9, 0)
+ORA_PRANZO_START = time(12, 0)
+ORA_PRANZO_END = time(13, 0)
 ORA_CENA_START = time(16, 0)
 ORA_CENA_END = time(23, 50)
 
@@ -83,7 +83,6 @@ if __name__ == '__main__':
         """
             Questa funzione serve per gestire il comando dashboard e genera un pdf con il plot delle diete settimanali dell'utente
 
-            :param message: messaggio inviato dall'utente
             :type message: Message
 
             :return: pdf con i dati delle diete settimanali
@@ -92,7 +91,7 @@ if __name__ == '__main__':
         telegram_id = message.chat.id
         dieta_dates = get_dieta_dates_by_telegram_id(telegram_id, mysql_cursor)
 
-        user_profile = get_user_profile(mysql_cursor)
+        user_profile = get_user_profile(telegram_id)
 
         # Creazione del PDF
         buffer = io.BytesIO()
@@ -182,7 +181,6 @@ if __name__ == '__main__':
         """
         Questa funzione serve per gestire il comando profilo e permette di visualizzare le informazioni del profilo
 
-        :param message: messaggio inviato dall'utente
         :type message: Message
 
         :return: i dati del profilo utente in forma tabellare
@@ -191,7 +189,7 @@ if __name__ == '__main__':
         telegram_id = message.chat.id
 
         # Ottieni le informazioni dell'utente dal database
-        user_profile = get_user_profile(mysql_cursor)
+        user_profile = get_user_profile(telegram_id)
 
         if user_profile:
             # Costruisci il messaggio delle informazioni dell'utente
@@ -213,25 +211,28 @@ if __name__ == '__main__':
         Questa funzione serve per gestire il comando profilo e permette di modificare i dati del profilo ponendo
         nuovamente all'utente le domande di profilazione
 
-        :param message: messaggio inviato dall'utente
-        :type message: Messag
+        :type message: Message
 
         :return: domande per l'aggiornamento dei dati del profilo
         :rtype: Message
         """
+
         telegram_id = message.chat.id
         index_edit = 0
-        user_profile_edit = get_user_profile(mysql_cursor)
+        user_profile_edit = get_user_profile(telegram_id)
         if not user_profile_edit:
             create_new_user(mysql_cursor, mysql_connection)
 
-        bot_telegram.send_message(telegram_id, message.chat.username + " " + "modifica i dati del tuo profilo!")
         # Invia il messaggio iniziale
-
-        # Domande per l'aggiornamento delle informazioni
+        bot_telegram.send_message(telegram_id, message.chat.username + " " + "modifica i dati del tuo profilo!")
 
         # Inizia a fare domande per l'aggiornamento delle informazioni
         ask_next_question(telegram_id, bot_telegram, questions_and_fields, index_edit)
+
+        reminder_message_thread = threading.Thread(target=send_reminder_message, daemon=True, args=(
+            event, bot_telegram, ORA_COLAZIONE_START, ORA_COLAZIONE_END, ORA_PRANZO_START, ORA_PRANZO_END,
+            ORA_CENA_START, ORA_CENA_END,))
+        reminder_message_thread.start()
 
     # Metodo per gestire il comando /start
     @bot_telegram.message_handler(commands=[START_COMMAND])
@@ -240,7 +241,6 @@ if __name__ == '__main__':
         Questa funzione serve per gestire il comando start ed invia il messaggio di info. Successivamente avvia la profilazione
         nuovamente all'utente le domande di profilazione
 
-        :param message: messaggio inviato dall'utente
         :type message: Message
 
         :return: domande per la profilazione dell'utente
@@ -252,7 +252,7 @@ if __name__ == '__main__':
         event.set()
         telegram_id = message.chat.id
 
-        user_profile_start = get_user_profile(mysql_cursor)
+        user_profile_start = get_user_profile(telegram_id)
         print(user_profile_start)
 
         # Controllo se l'utente non esiste
@@ -274,7 +274,6 @@ if __name__ == '__main__':
 
         print("post-start" + index.__str__())
 
-    # Metodo per gestire le risposte dell'utente alle domande della profilazione
     @bot_telegram.message_handler(func=lambda message: True, content_types=['text', 'voice', 'photo'])
     def handle_profile_response(message):
         """
@@ -282,8 +281,8 @@ if __name__ == '__main__':
         Inoltre, gestisce anche la conversazione post-profilazione attraverso l'utilizzo di un indice che determina l'inizio e la fine
         delle domande per la profilazione. Vengono accettate dopo la profilazione in input, messaggi testuali, vocali e fotografie.
         E' possibile anche rispondere ai messaggi di risposta ai reminder permettendo all'utente di fare delle opportune domande
+        per gli alimenti nella data del messaggio a cui sta rispondendo
 
-        :param message: messaggio inviato dall'utente
         :type message: Message
 
         :return: domande per la profilazione dell'utente, reminder e passa le risposte a chatgpt
@@ -349,7 +348,7 @@ if __name__ == '__main__':
                                                                     args=(event, bot_telegram, ))
                     reminder_week_message_thread.start()
                     if message.reply_to_message and message.reply_to_message.text in user_response_message:
-                        user_profile = get_user_profile(mysql_cursor)
+                        user_profile = get_user_profile(telegram_id)
                         timestamp = message.reply_to_message.date
 
                         # Converti il timestamp in un oggetto datetime
@@ -366,7 +365,7 @@ if __name__ == '__main__':
 
                         if message.content_type == 'text':
 
-                            user_profile = get_user_profile(mysql_cursor)
+                            user_profile = get_user_profile(telegram_id)
                             print(user_profile)
                             respost = write_chatgpt(openai, user_response, user_profile, mysql_cursor, telegram_id)
                             bot_telegram.send_message(telegram_id, respost)
@@ -397,6 +396,16 @@ if __name__ == '__main__':
 
 @bot_telegram.message_handler(func=lambda message: True)
 def handle_reminder_response(message):
+    """
+    Questa funzione serve per gestire le risposte subito dopo il reminder cosi da salvare il cibo nel database.
+    Questo handler viene utilizzato attraverso un thread e si ripete ciclicamente ogni n ore
+
+    :type message: Message
+
+
+    :return: la query per salvare il cibo scritto dall'utente nel messaggio
+    :rtype: Message
+    """
     global meal_type, mysql_cursor, mysql_connection, queue, user_response_message
 
     serialized_message = pickle.dumps(message)
@@ -424,7 +433,7 @@ def handle_reminder_response(message):
                 save_user_food_response(bot_telegram, mysql_cursor, mysql_connection, telegram_id, meal_type,
                                         user_response)
                 event.clear()
-                event.wait(20)
+                event.wait(10)
                 event.set()
 
         elif check_time_in_range(current_time_reminder, ORA_CENA_START, ORA_CENA_END):
@@ -444,6 +453,14 @@ def handle_reminder_response(message):
 # Metodo per gestire i messaggi vocali dell'utente
 @bot_telegram.message_handler(func=lambda message: True)
 def voice_handler(message):
+    """
+    Questo handler serve per poter gestire le risposte ai messaggi vocali. Ovvero, tramite chatgpt
+
+    :type message: Message
+
+    :return: un messaggio all'utente con la risposta data da chatgpt
+    :rtype: Message
+    """
     file_id = message.voice.file_id
     file = bot_telegram.get_file(file_id)
     telegram_id = message.chat.id
@@ -459,7 +476,7 @@ def voice_handler(message):
         # chiamare la funzione che permette di riconoscere la voce e convertire il file .ogg in .wav
         text = voice_recognizer()
 
-        user_profile = get_user_profile(mysql_cursor)
+        user_profile = get_user_profile(telegram_id)
         print(user_profile)
         respost = write_chatgpt(openai, text, user_profile, mysql_cursor, telegram_id)
         bot_telegram.send_message(message.chat.id, respost)
@@ -469,20 +486,28 @@ def voice_handler(message):
 
 @bot_telegram.message_handler(func=lambda message: True)
 def photo_handler(message):
-    print("oddio")
+    """
+    Questo handler serve per poter gestire le risposte alle foto anche con caption. Ovvero, tramite chatgpt
+
+    :type message: Message
+
+    :return: un messaggio all'utente con la risposta data da chatgpt
+    :rtype: Message
+    """
+
     telegram_id = message.chat.id
     # Esegui il riconoscimento del cibo
 
     photo_result = photo_recognizer(message, bot_telegram)
     if message.caption:
         results = photo_result + message.caption
-        user_profile = get_user_profile(mysql_cursor)
+        user_profile = get_user_profile(telegram_id)
         print(results)
         respost = write_chatgpt(openai, results, user_profile, mysql_cursor, telegram_id)
         bot_telegram.send_message(telegram_id, respost)
     else:
         results = photo_result
-        user_profile = get_user_profile(mysql_cursor)
+        user_profile = get_user_profile(telegram_id)
         print(results)
         respost = write_chatgpt(openai, results, user_profile, mysql_cursor, telegram_id)
         bot_telegram.send_message(telegram_id, respost)

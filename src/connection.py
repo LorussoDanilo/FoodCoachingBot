@@ -93,27 +93,30 @@ def create_database_and_table_if_not_exists(cursor, database_name):
         try:
             cursor.execute(f"CREATE DATABASE {database_name}")
             print(f"Database '{database_name}' creato con successo.")
-            # Utilizza il database
-            cursor.execute(f"USE {database_name}")
-            create_tables(cursor)
+
+            create_tables(cursor, database_name)
         except Exception as e:
             print(f"Errore durante la creazione del database: {e}")
     else:
-        create_tables(cursor)
+        create_tables(cursor, database_name)
 
 
-def create_tables(cursor):
+def create_tables(cursor, database_name):
     """
         Questa funzione crea le tabelle se non esistono
 
         :param cursor: cursore della connessione per eseguire le query
         :type cursor: Cursor
+        :param database_name: nome del database
+        :type database_name: str
 
 
         :return: l'esecuzione della query per creare le tabelle se non esistono altrimenti non fa nulla
         :rtype: None
         """
     try:
+        # Utilizza il database
+        cursor.execute(f"USE {database_name}")
         # Crea le tabelle
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS utenti (
