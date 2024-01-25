@@ -61,12 +61,16 @@ index = 0
 
 ORA_COLAZIONE_START = time(7, 0)
 ORA_COLAZIONE_END = time(11, 0)
-ORA_PRANZO_START = time(12, 0)
+ORA_PRANZO_START = time(11, 51,10)
 ORA_PRANZO_END = time(15, 0)
 ORA_CENA_START = time(16, 0)
 ORA_CENA_END = time(23, 50)
 
+ORA_REMINDER_SETTIMANALE = time(11, 13, 10)
+
 queue = Queue()
+
+user_response_message = []  # This initializes an empty list named user_response_message_id
 
 
 def check_time_in_range(current_time, start_time, end_time):
@@ -287,25 +291,43 @@ if __name__ == '__main__':
 
 
             elif index > len(questions_and_fields):
+
                 if event.is_set():
                     reminder_message_thread = threading.Thread(target=send_reminder_message, daemon=True)
                     reminder_message_thread.start()
-                    reminder_thread = threading.Thread(target=send_reminder, daemon=True, args=(message,))
+
+                    reminder_thread = threading.Thread(target=handle_reminder_response, daemon=True, args=(message,))
                     reminder_thread.start()
 
-
-
                 else:
-                    if message.content_type == 'text':
-
+                    reminder_week_message_thread = threading.Thread(target=send_week_reminder_message, daemon=True)
+                    reminder_week_message_thread.start()
+                    if message.reply_to_message and message.reply_to_message.text in user_response_message:
                         user_profile = get_user_profile(telegram_id)
-                        print(user_profile)
-                        respost = write_chatgpt(openai, user_response, user_profile, mysql_cursor, telegram_id)
+                        timestamp = message.reply_to_message.date
+
+                        # Converti il timestamp in un oggetto datetime
+                        data_messaggio = datetime.utcfromtimestamp(timestamp).strftime('%d/%m/%y')
+
+                        user_response_reply = (
+                            f"Considera che in questa data {data_messaggio} ho mangiato: "
+                            f"{message.reply_to_message.text}. In riferimento a quella data: {user_response}"
+                        )
+                        respost = write_chatgpt(openai, user_response_reply, user_profile, mysql_cursor, telegram_id)
+                        print(user_response_reply)
                         bot_telegram.send_message(telegram_id, respost)
-                    elif message.content_type == 'voice':
-                        voice_handler(message)
-                    elif message.content_type == 'photo':
-                        photo_handler(message)
+                    else:
+
+                        if message.content_type == 'text':
+
+                            user_profile = get_user_profile(telegram_id)
+                            print(user_profile)
+                            respost = write_chatgpt(openai, user_response, user_profile, mysql_cursor, telegram_id)
+                            bot_telegram.send_message(telegram_id, respost)
+                        elif message.content_type == 'voice':
+                            voice_handler(message)
+                        elif message.content_type == 'photo':
+                            photo_handler(message)
 
         except Exception as e:
             print(f"Valore errato: {e}")
@@ -328,15 +350,17 @@ if __name__ == '__main__':
 
 
 @bot_telegram.message_handler(func=lambda message: True)
-def send_reminder(message):
-    global meal_type, mysql_cursor, mysql_connection, queue
+def handle_reminder_response(message):
+    global meal_type, mysql_cursor, mysql_connection, queue, user_response_message
 
     serialized_message = pickle.dumps(message)
     queue.put(serialized_message)
 
     telegram_ids = get_all_telegram_ids()
     deserialized_message = pickle.loads(serialized_message)
+    user_response_message.append(str(deserialized_message.text))
     user_response = str(deserialized_message.text)
+
     current_time_reminder = datetime.now().time()
     try:
 
@@ -354,7 +378,7 @@ def send_reminder(message):
                 save_user_food_response(bot_telegram, mysql_cursor, mysql_connection, telegram_id, meal_type,
                                         user_response)
                 event.clear()
-                event.wait(10)
+                event.wait(20)
                 event.set()
 
         elif check_time_in_range(current_time_reminder, ORA_CENA_START, ORA_CENA_END):
@@ -371,7 +395,21 @@ def send_reminder(message):
         print(f"Main exception occurred: {main_exception}")
 
 
+
+
 # chat_id checks id corresponds to your list or not.
+def send_week_reminder_message():
+    telegram_ids = get_all_telegram_ids()
+
+    current_time_reminder = datetime.now().time()
+    # Serializzazione dell'oggetto Message
+    while not event.is_set():
+        for telegram_id in telegram_ids:
+            bot_telegram.send_message(telegram_id,
+                                      "E' passata una settimana! Tieni d'occhio la tua dieta. Tocca su /dashboard",
+                                      trem.sleep(60 * 60 * 24 * 7))
+
+
 def send_reminder_message():
     telegram_ids = get_all_telegram_ids()
 
@@ -384,7 +422,7 @@ def send_reminder_message():
                 bot_telegram.send_message(telegram_id, "Buongiorno! Cosa hai mangiato a colazione?", trem.sleep(10))
 
             elif check_time_in_range(current_time_reminder, ORA_PRANZO_START, ORA_PRANZO_END):
-                bot_telegram.send_message(telegram_id, "Pranzo time! Cosa hai mangiato a pranzo?", trem.sleep(10))
+                bot_telegram.send_message(telegram_id, "Pranzo time! Cosa hai mangiato a pranzo?", trem.sleep(20))
 
             elif check_time_in_range(current_time_reminder, ORA_CENA_START, ORA_CENA_END):
                 bot_telegram.send_message(telegram_id, "Cena! Cosa hai mangiato a cena?", trem.sleep(10))
