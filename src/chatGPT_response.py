@@ -1,9 +1,37 @@
+"""
+Questo modulo contiene le funzioni che servono per passare i messaggi degli utenti a chatgpt applicando i filtri conversazionali
+
+    Danilo Lorusso - Version 1.0
+"""
+
+
 import locale
 
-from utils.controls import is_food_question
+from src.controls import is_food_question
 
 locale.setlocale(locale.LC_TIME, 'it_IT')
+
+
 def write_chatgpt(openai, message, profilo_utente, mysql_cursor, telegram_id):
+    """
+    Questa funzione serve per passare i messaggi dell'utente a chatgpt filtrandole con is_food_question e passando
+    a chatgpt anche il profilo dell'utente e la dieta settimanale
+
+    :param openai: api key di openai
+    :type openai: ChatCompletion
+    :param message: messaggio inviato dall'utente
+    :type message: Message
+    :param profilo_utente: dati del profilo utente
+    :type profilo_utente: dict
+    :param mysql_cursor: cursore per eseguire le query
+    :type mysql_cursor: execute, fetchall
+    :param telegram_id: telegram_id dell'utente
+    :type telegram_id: int
+
+    :return: la risposta data da chatgpt
+    :rtype: str
+    """
+
     dieta_settimanale_text = ""
     try:
         # Estrai il testo dal messaggio
@@ -72,6 +100,15 @@ def write_chatgpt(openai, message, profilo_utente, mysql_cursor, telegram_id):
 
 
 def get_dieta_settimanale_info(cursor, telegram_id):
+    """
+        Questa funzione serve per recuperare i dati delle diete settimanali svolte dall'utente
+        :param cursor: cursore per eseguire le query
+        :type cursor: execute, fetchall
+        :param telegram_id: id_telegram dell'utente
+        :type telegram_id: int
+        :return: la lista delle diete settimanali sotto forma di stringa
+        :rtype: str
+        """
     try:
         # Esegui la query per ottenere le informazioni sulla dieta settimanale dell'utente
         cursor.execute("""
@@ -106,4 +143,3 @@ def get_dieta_settimanale_info(cursor, telegram_id):
     except Exception as e:
         print(f"Si è verificato un errore durante l'estrazione delle informazioni sulla dieta settimanale: {e}")
         return None
-

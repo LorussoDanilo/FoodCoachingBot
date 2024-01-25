@@ -17,6 +17,12 @@ locale.setlocale(locale.LC_TIME, 'it_IT')
 
 
 def connect_mysql():
+    """Questa funzione permette di aprire la connessione con mysql in locale,
+    crea il database foodcoachusers e le tabelle se non esiste o uno o l'altro.
+
+    :return: mysql_cursor e mysql_connection
+    :rtype: connection.cursor, connection
+    """
     mysql_host = os.getenv("MYSQL_HOST")
     mysql_user = os.getenv("MYSQL_USER")
     mysql_password = os.getenv("MYSQL_PASSWORD")
@@ -37,10 +43,7 @@ def connect_mysql():
             cursor = connection.cursor()
 
             # Chiama la funzione per verificare e creare il database se necessario
-            create_database_if_not_exists(cursor, mysql_database)
-
-            # Utilizza il database
-            cursor.execute(f"USE {mysql_database}")
+            create_database_and_table_if_not_exists(cursor, mysql_database)
 
             # Restituisci la connessione e il cursore
             return connection, cursor
@@ -52,6 +55,18 @@ def connect_mysql():
 
 
 def check_database_existence(cursor, database_name):
+    """
+    Questa funzione controlla se il database esiste
+
+    :param cursor: cursore della connessione per eseguire le query
+    :type cursor: Cursor
+    :param database_name: nome del database di cui vogliamo controllare l'esistenza
+    :type database_name: str
+
+    :return: True oppure False
+    :rtype: boolean
+
+    """
     try:
         cursor.execute("SHOW DATABASES")
         databases = cursor.fetchall()
@@ -61,16 +76,43 @@ def check_database_existence(cursor, database_name):
         return False
 
 
-def create_database_if_not_exists(cursor, database_name):
+def create_database_and_table_if_not_exists(cursor, database_name):
+    """
+    Questa funzione crea il database se non esiste
+
+    :param cursor: cursore della connessione per eseguire le query
+    :type cursor: Cursor
+    :param database_name: nome del database che vogliamo creare e di cui controlliamo l'esistenza
+    :type database_name: stl
+
+    :return: l'esecuzione della query per creare il database (se non esiste) e il metodo per creare le tabelle.
+    :rtype: None
+
+    """
     if not check_database_existence(cursor, database_name):
         try:
             cursor.execute(f"CREATE DATABASE {database_name}")
             print(f"Database '{database_name}' creato con successo.")
+            # Utilizza il database
+            cursor.execute(f"USE {database_name}")
+            create_tables(cursor)
         except Exception as e:
             print(f"Errore durante la creazione del database: {e}")
+    else:
+        create_tables(cursor)
 
 
 def create_tables(cursor):
+    """
+        Questa funzione crea le tabelle se non esistono
+
+        :param cursor: cursore della connessione per eseguire le query
+        :type cursor: Cursor
+
+
+        :return: l'esecuzione della query per creare le tabelle se non esistono altrimenti non fa nulla
+        :rtype: None
+        """
     try:
         # Crea le tabelle
         cursor.execute("""
@@ -124,20 +166,17 @@ def create_tables(cursor):
         print(f"Errore durante la creazione delle tabelle: {e}")
 
 
-def call_create_tables_if_not_exists():
-    connection, cursor = connect_mysql()
-
-    if connection and cursor:
-        create_tables(cursor)
-
-        # Commit e chiudi la connessione
-        connection.commit()
-        connection.close()
-
-
 # Questa funzione serve per gestire le API e le risorse del progetto
 # come l'xml del testo relativo ai comandi usati dall'utente
 def connect():
+    """
+        Questa funzione serve per assegnare le chiavi delle api e le chiavi segrete utili al funzionamento del bot.
+
+        :return: openai api key, token_telegram api key e la root dove è contenuto il file xml per i messaggi di info
+        :rtype: str
+
+    """
+
     openai.api_key = os.getenv(TOKEN_CHAT_GPT)
     bot = telebot.TeleBot(os.getenv(TOKEN_TELEGRAM))
     tree = et.parse(os.getenv(FILE_XML))
