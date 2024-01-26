@@ -4,7 +4,6 @@ Questo modulo contiene i vari handler dei messagi dell'utente e la gestione dei 
     Danilo Lorusso - Version 1.0
 """
 
-
 import io
 import locale
 import os
@@ -27,6 +26,115 @@ from src.handle_user_data import get_user_profile, create_new_user, ask_next_que
     voice_recognizer, _clear, photo_recognizer
 from src.connection import connect, connect_mysql
 from src.controls import control_tag, check_time_in_range
+
+
+def generate_all_weekly_diets_pdf(message):
+    """
+    Questa funzione serve per gestire il comando dashboard e genera un pdf con il plot delle diete settimanali dell'utente
+
+    :type message: Message
+
+    :return: pdf con i dati delle diete settimanali
+    :rtype: BytesIO
+    """
+    print(message)
+
+
+def show_user_profile(message):
+    """
+    Questa funzione serve per gestire il comando profilo e permette di visualizzare le informazioni del profilo
+
+    :type message: Message
+
+    :return: i dati del profilo utente in forma tabellare
+    :rtype: Message
+    """
+    print(message)
+
+
+def send_welcome(message):
+    """
+    Questa funzione serve per gestire il comando start ed invia il messaggio di info. Successivamente avvia la profilazione
+    nuovamente all'utente le domande di profilazione
+
+    :type message: Message
+
+    :return: domande per la profilazione dell'utente
+    :rtype: Message
+    """
+    print(message)
+
+
+def edit_command(message):
+    """
+    Questa funzione serve per gestire il comando profilo e permette di modificare i dati del profilo ponendo
+    nuovamente all'utente le domande di profilazione
+
+    :type message: Message
+
+    :return: domande per l'aggiornamento dei dati del profilo
+    :rtype: Message
+    """
+    print(message)
+
+
+def handle_reminder_response(message):
+    """
+    Questa funzione serve per gestire le risposte subito dopo il reminder cosi da salvare il cibo nel database.
+    Questo handler viene utilizzato attraverso un thread e si ripete ciclicamente ogni n ore
+
+    :type message: Message
+
+
+    :return: la query per salvare il cibo scritto dall'utente nel messaggio
+    :rtype: Message
+    """
+    print(message)
+
+
+def handle_profile_response_copy(message):
+    """
+    Questa funzione serve per gestire le risposte dell'utente alle domande della profilazione salvando le risposte nel database.
+    Inoltre, gestisce anche la conversazione post-profilazione attraverso l'utilizzo di un indice che determina l'inizio e la fine
+    delle domande per la profilazione. Vengono accettate dopo la profilazione in input, messaggi testuali, vocali e fotografie.
+    E' possibile anche rispondere ai messaggi di risposta ai reminder permettendo all'utente di fare delle opportune domande
+    per gli alimenti nella data del messaggio a cui sta rispondendo.
+    Questa è una funzione di copia poichè il message handler non viene letto dalla pydoc
+
+    :type message: Message
+
+    :return: domande per la profilazione dell'utente, reminder e passa le risposte a chatgpt
+    :rtype: Message
+    """
+    print(message)
+
+
+def photo_handler_copy(message):
+    """
+    Questo handler serve per poter gestire le risposte alle foto anche con caption. Ovvero, tramite chatgpt
+    Questa è una funzione di copia poichè il message handler non viene letto dalla pydoc
+
+
+    :type message: Message
+
+    :return: un messaggio all'utente con la risposta data da chatgpt
+    :rtype: Message
+    """
+    print(message)
+
+
+def voice_handler_copy(message):
+    """
+    Questo handler serve per poter gestire le risposte ai messaggi vocali. Ovvero, tramite chatgpt
+    Questa è una funzione di copia poichè il message handler non viene letto dalla pydoc
+
+    :type message: Message
+
+    :return: un messaggio all'utente con la risposta data da chatgpt
+    :rtype: Message
+    """
+    print(message)
+
 
 locale.setlocale(locale.LC_TIME, 'it_IT')
 load_dotenv()
@@ -175,6 +283,7 @@ if __name__ == '__main__':
         buffer.seek(0)
         return buffer
 
+
     # metodo per gestire il comando /profilo per visualizzare i dati del profilo
     @bot_telegram.message_handler(commands=[PROFILO_COMMAND])
     def show_user_profile(message):
@@ -203,6 +312,7 @@ if __name__ == '__main__':
         else:
             # Messaggio se l'utente non ha un profilo
             bot_telegram.send_message(telegram_id, "Non hai ancora completato il tuo profilo.")
+
 
     # Metodo per gestire il comando /modifica
     @bot_telegram.message_handler(commands=[EDIT_COMMAND])
@@ -233,6 +343,7 @@ if __name__ == '__main__':
             event, bot_telegram, ORA_COLAZIONE_START, ORA_COLAZIONE_END, ORA_PRANZO_START, ORA_PRANZO_END,
             ORA_CENA_START, ORA_CENA_END,))
         reminder_message_thread.start()
+
 
     # Metodo per gestire il comando /start
     @bot_telegram.message_handler(commands=[START_COMMAND])
@@ -273,6 +384,7 @@ if __name__ == '__main__':
         index += 1
 
         print("post-start" + index.__str__())
+
 
     @bot_telegram.message_handler(func=lambda message: True, content_types=['text', 'voice', 'photo'])
     def handle_profile_response(message):
@@ -345,7 +457,7 @@ if __name__ == '__main__':
 
                 else:
                     reminder_week_message_thread = threading.Thread(target=send_week_reminder_message, daemon=True,
-                                                                    args=(event, bot_telegram, ))
+                                                                    args=(event, bot_telegram,))
                     reminder_week_message_thread.start()
                     if message.reply_to_message and message.reply_to_message.text in user_response_message:
                         user_profile = get_user_profile(telegram_id)

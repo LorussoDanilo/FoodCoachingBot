@@ -102,10 +102,12 @@ def write_chatgpt(openai, message, profilo_utente, mysql_cursor, telegram_id):
 def get_dieta_settimanale_info(cursor, telegram_id):
     """
         Questa funzione serve per recuperare i dati delle diete settimanali svolte dall'utente
+
         :param cursor: cursore per eseguire le query
         :type cursor: execute, fetchall
         :param telegram_id: id_telegram dell'utente
         :type telegram_id: int
+
         :return: la lista delle diete settimanali sotto forma di stringa
         :rtype: str
         """

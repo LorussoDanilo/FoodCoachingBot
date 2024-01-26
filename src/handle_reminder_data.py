@@ -97,7 +97,7 @@ def get_or_insert_dieta_settimanale(cursor, telegram_id, date):
     :type cursor: Cursor
     :param telegram_id: telegram_id dell'utente
     :type telegram_id: int
-    :param date: serve per ottenere la data corrente
+    :param date: serve per ottenere la data corrente quando viene richiamata la funzione
     :type date: date
 
     :return: l'id della dieta settimanale
@@ -131,7 +131,7 @@ def get_or_insert_dieta_settimanale(cursor, telegram_id, date):
                     # Calcola la data successiva
                     next_week_date = last_week_date[0] + timedelta(days=7)
                     # Se la data attuale è successiva alla data della settimana precedente, incrementa l'ID
-                    if date >= next_week_date:
+                    if date == next_week_date:
                         new_dieta_settimanale_id = max_dieta_settimanale_id + 1
                     else:
                         new_dieta_settimanale_id = max_dieta_settimanale_id
@@ -140,10 +140,13 @@ def get_or_insert_dieta_settimanale(cursor, telegram_id, date):
             else:
                 new_dieta_settimanale_id = 1
 
-            # Inserisci una nuova riga con l'indice incrementato
-            cursor.execute(
-                "INSERT INTO dieta_settimanale (dieta_settimanale_id, telegram_id, data) VALUES (%s, %s, %s)",
-                (new_dieta_settimanale_id, telegram_id, date))
+            if new_dieta_settimanale_id == 1:
+                new_dieta_settimanale_id = max_dieta_settimanale_id
+            else:
+                # Inserisci una nuova riga con l'indice incrementato
+                cursor.execute(
+                    "INSERT INTO dieta_settimanale (dieta_settimanale_id, telegram_id, data) VALUES (%s, %s, %s)",
+                    (new_dieta_settimanale_id, telegram_id, date))
 
             return new_dieta_settimanale_id
     except Exception as e:
