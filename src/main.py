@@ -78,7 +78,7 @@ def edit_command(message):
     print(message)
 
 
-def handle_reminder_response(message):
+def handle_reminder_response_copy(message):
     """
     Questa funzione serve per gestire le risposte subito dopo il reminder cosi da salvare il cibo nel database.
     Questo handler viene utilizzato attraverso un thread e si ripete ciclicamente ogni n ore
@@ -162,6 +162,10 @@ mysql_connection, mysql_cursor = connect_mysql()
 # Inizializzazione variabili per il bot telegram, api di chat gpt e del file xml con le informazioni
 openai, bot_telegram, root = connect()
 
+# Inizializzazione delle chiavi per l'api di edamam
+app_id = os.getenv('EDAMAM_APP_ID')
+app_key = os.getenv('EDAMAM_APP_KEY')
+
 # Variabile per gestire le funzionalità del chatbot. Serve per capire quando una funzionalità deve cominciare
 event = threading.Event()
 
@@ -172,8 +176,8 @@ index = 0
 ORA_COLAZIONE_START = time(8, 0)
 ORA_COLAZIONE_END = time(9, 0)
 ORA_PRANZO_START = time(12, 0)
-ORA_PRANZO_END = time(13, 0)
-ORA_CENA_START = time(16, 0)
+ORA_PRANZO_END = time(16, 0)
+ORA_CENA_START = time(17, 0)
 ORA_CENA_END = time(23, 50)
 
 ORA_REMINDER_SETTIMANALE = time(11, 13, 10)
@@ -434,13 +438,13 @@ if __name__ == '__main__':
 
                 for telegram_id in telegram_ids:
                     if check_time_in_range(current_time_reminder, ORA_COLAZIONE_START, ORA_COLAZIONE_END):
-                        bot_telegram.send_message(telegram_id, "Buongiorno! Cosa hai mangiato a colazione?")
+                        bot_telegram.send_message(telegram_id, "Buongiorno! Cosa hai mangiato a colazione? Indica prima del cibo la quantità.")
 
                     elif check_time_in_range(current_time_reminder, ORA_PRANZO_START, ORA_PRANZO_END):
-                        bot_telegram.send_message(telegram_id, "Pranzo time! Cosa hai mangiato a pranzo?")
+                        bot_telegram.send_message(telegram_id, "Pranzo time! Cosa hai mangiato a pranzo? Indica prima del cibo la quantità.")
 
                     elif check_time_in_range(current_time_reminder, ORA_CENA_START, ORA_CENA_END):
-                        bot_telegram.send_message(telegram_id, "Cena! Cosa hai mangiato a cena?")
+                        bot_telegram.send_message(telegram_id, "Cena! Cosa hai mangiato a cena? Indica prima del cibo la quantità.")
                     else:
                         event.clear()
 
@@ -535,7 +539,7 @@ def handle_reminder_response(message):
             for telegram_id in telegram_ids:
                 meal_type = "colazione"
                 save_user_food_response(bot_telegram, mysql_cursor, mysql_connection, telegram_id, meal_type,
-                                        user_response)
+                                        user_response, app_id, app_key)
                 event.clear()
                 event.wait(10)
                 event.set()
@@ -543,7 +547,7 @@ def handle_reminder_response(message):
             for telegram_id in telegram_ids:
                 meal_type = "pranzo"
                 save_user_food_response(bot_telegram, mysql_cursor, mysql_connection, telegram_id, meal_type,
-                                        user_response)
+                                        user_response, app_id, app_key)
                 event.clear()
                 event.wait(10)
                 event.set()
@@ -552,7 +556,7 @@ def handle_reminder_response(message):
             for telegram_id in telegram_ids:
                 meal_type = "cena"
                 save_user_food_response(bot_telegram, mysql_cursor, mysql_connection, telegram_id, meal_type,
-                                        user_response)
+                                        user_response, app_id, app_key)
                 event.clear()
                 event.wait(10)
                 event.set()

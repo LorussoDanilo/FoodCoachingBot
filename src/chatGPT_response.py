@@ -126,12 +126,17 @@ def get_dieta_settimanale_info(cursor, telegram_id):
         # Ottieni tutti i risultati delle query
         results = cursor.fetchall()
 
+        #Fare la query per ottenere il nome del cibo dall'id nella tabella dei valori nutrizionali
+        #Poi mettere i risultati della query in una variabile
+
         # Creare una struttura dati per memorizzare le informazioni
         dieta_settimanale_info = []
 
         # Processa i risultati della query e popola la struttura dati
         for result in results:
             dieta_settimanale_id, data, nome_giorno, nome_periodo, nome_cibo = result
+            # Creare una lista con i risultati della query per i valori nutrizionali ed aggiungere gli elementi della lista con .append qui sotto
+
             dieta_settimanale_info.append({
                 'dieta_settimanale_id': dieta_settimanale_id,
                 'data': data,

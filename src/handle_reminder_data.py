@@ -7,11 +7,14 @@ degli utenti dopo i reminder
 
 import calendar
 import locale
+import time as trem
 from datetime import datetime, timedelta
 
-from src.handle_user_data import get_all_telegram_ids
+import requests
+from deep_translator import GoogleTranslator
+
 from src.controls import check_time_in_range
-import time as trem
+from src.handle_user_data import get_all_telegram_ids
 
 # Imposta la lingua italiana per il modulo locale
 locale.setlocale(locale.LC_TIME, 'it_IT')
@@ -53,13 +56,13 @@ def send_reminder_message(event, bot_telegram, ORA_COLAZIONE_START, ORA_COLAZION
     while event.is_set():
         for telegram_id in telegram_ids:
             if check_time_in_range(current_time_reminder, ORA_COLAZIONE_START, ORA_COLAZIONE_END):
-                bot_telegram.send_message(telegram_id, "Buongiorno! Cosa hai mangiato a colazione?", trem.sleep(10))
+                bot_telegram.send_message(telegram_id, "Buongiorno! Cosa hai mangiato a colazione? Indica prima del cibo la quantità.", trem.sleep(10))
 
             elif check_time_in_range(current_time_reminder, ORA_PRANZO_START, ORA_PRANZO_END):
-                bot_telegram.send_message(telegram_id, "Pranzo time! Cosa hai mangiato a pranzo?", trem.sleep(10))
+                bot_telegram.send_message(telegram_id, "Pranzo time! Cosa hai mangiato a pranzo? Indica prima del cibo la quantità.", trem.sleep(10))
 
             elif check_time_in_range(current_time_reminder, ORA_CENA_START, ORA_CENA_END):
-                bot_telegram.send_message(telegram_id, "Cena! Cosa hai mangiato a cena?", trem.sleep(10))
+                bot_telegram.send_message(telegram_id, "Cena! Cosa hai mangiato a cena? Indica prima del cibo la quantità.", trem.sleep(10))
 
 
 # chat_id checks id corresponds to your list or not.
@@ -220,8 +223,68 @@ def get_or_insert_periodo_giorno(cursor, giorno_settimana_id, meal_type):
         print(f"insert_periodo_giorno: {e}")
 
 
+def get_nutritional_info(food_name, app_id, app_key):
+    """
+    Questa funzione serve per recuperare le informazioni nutrizionali del cibo inserito dall'utente e salvarlo nella tabella valori_nutrizionali
+
+    :param food_name: nome del cibo inserito dall'utente
+    :type food_name: str
+    :param app_id: app id dell'api edamam
+    :type app_id: str
+    :param app_key: app key dell'api edamam
+    :type app_key: str
+
+    :return: informazioni nutrizionali del cibo inserito dall'utente
+    :rtype: str
+    """
+
+    base_url = "https://api.edamam.com/api/nutrition-data"
+
+    # Costruisci i parametri della richiesta
+    params = {
+        'app_id': app_id,
+        'app_key': app_key,
+        'ingr': food_name
+    }
+
+    # Esegui la richiesta all'API di Edamam
+    response = requests.get(base_url, params=params)
+
+    # Verifica se la richiesta è stata eseguita con successo (status code 200)
+    if response.status_code == 200:
+        data = response.json()
+
+        # Estrai i valori nutrizionali
+        if 'totalNutrients' in data:
+            nutrients = data['totalNutrients']
+            for nutrient in nutrients.values():
+                print(f"{nutrient['label']}: {nutrient['quantity']} {nutrient['unit']}")
+        else:
+            print("Valori nutrizionali non disponibili.")
+    else:
+        print(f"Errore nella richiesta API: {response.status_code}")
+
+
+def traduci_testo(testo):
+    """
+
+    :param testo: testo inserito dall'utente da tradurre
+    :type testo: str
+    :return: testo tradotto
+    :rtype: str
+    """
+
+    try:
+        traduzione = GoogleTranslator(source='auto', target='en').translate(testo)
+        return traduzione
+    except Exception as e:
+        print(f"Errore durante la traduzione: {e}")
+        return None
+
+
 # Funzione per gestire la risposta del pasto
-def save_user_food_response(bot_telegram, mysql_cursor, mysql_connection, telegram_id, meal_type, food_name):
+def save_user_food_response(bot_telegram, mysql_cursor, mysql_connection, telegram_id, meal_type, food_name, app_id,
+                            app_key):
     """
         Questa funzione serve per salvare le risposte dell'utente nel database dopo che il reminder è stato inviato
 
@@ -241,6 +304,10 @@ def save_user_food_response(bot_telegram, mysql_cursor, mysql_connection, telegr
         :param meal_type: serve per ottenere il nome del periodo del giorno (colazione, pranzo e cena) in
          base alla fascia oraria in cui ci si trova
         :type meal_type: str
+        :param app_id:
+        :type app_id: str
+        :param app_key:
+        :type app_key: str
 
 
         :return: la commit della query per salvare la risposta dell'utente dopo il reminder
@@ -268,6 +335,8 @@ def save_user_food_response(bot_telegram, mysql_cursor, mysql_connection, telegr
 
         # Esegui il commit delle modifiche al database
         mysql_connection.commit()
+        translated_food = traduci_testo(food_name)
+        print(get_nutritional_info(translated_food, app_id, app_key))
 
         return bot_telegram.send_message(telegram_id,
                                          f"{meal_type} inserito/a correttamente! Ora puoi chiedermi ciò che desideri 😊")

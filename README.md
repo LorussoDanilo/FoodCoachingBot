@@ -32,10 +32,24 @@ Profilazione:
 Modifica dati profilo:
 - L'utente può modificare i dati del proprio profilo attraverso il comando /modifica
 
+Visualizza dati profilo:
+- L'utente può visualizzare i dati del proprio profilo con il comando /profilo
+
+Visualizza dashboard:
+- L'utente può visualizzare i dati delle diete settimanali su un pdf plottando i dati delle diete settimanali
+
+Dieta settimanale:
+- L'utente, attraverso i reminder di colazione, pranzo e cena costruisce la sua dieta settimanale. Nella risposta ai reminder l'utente salva il cibo nel database e vengono salvati in automatico anche i valori nutrizionali del cibo con l'api di edamame
+
 Modalità di interazione:
 - Testuale: l'utente può chiedere al chatbot qualsiasi domanda inerente al cibo.
-- Vocale: l'utente può comunicare anche tramite messaggi vocali
+- Vocale: l'utente può comunicare anche tramite messaggi vocali con l'utilizzo dell'api di Google Speech-To-Text
+- Fotografia: l'utente può inviare una foto del cibo al chatbot e il chatbot risponde se va bene oppure no in base ai vari filtri utilizzando l'api di Roboflow di un modello allenato con un dataset di piatti pugliesi.
 
 Filtri conversazionali:
 - E' presente un filtro che permette all’utente di poter chattare con il bot tramite telegram di argomenti riguardanti solo l’ambito food. Realizzato attraverso l'identificazione di keyword nel messaggio dell'utente
 - Il chatbot adatta la conversazione in base al profilo dell’utente, ovvero in base all’età, disturbi e che tipo di sentimento prova mentre mangia o pensa al cibo.
+- Il chatbot adatta la conversazione anche in base alle diete settimanali dell'utente ottenute durante l'utilizzo dell'app
+
+Message Reply:
+- L'utente può rispondere ai vecchi reminder facendo domande su quello specifico giorno. Es: L'utente vuole chiedere al chatbot se ha fatto bene a mangiare anche un altro cibo in quel giorno
