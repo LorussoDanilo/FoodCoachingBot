@@ -109,6 +109,7 @@ def get_user_profile(telegram_id):
             :rtype: dict
         """
     try:
+        mysql_connection, mysql_cursor = connect_mysql()
 
         # Query SQL to retrieve the user profile based on telegram_id
         mysql_cursor.execute("SELECT * FROM utenti WHERE telegram_id = %s", (telegram_id,))

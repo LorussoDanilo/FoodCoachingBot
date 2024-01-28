@@ -39,7 +39,7 @@ Visualizza dashboard:
 - L'utente può visualizzare i dati delle diete settimanali su un pdf plottando i dati delle diete settimanali
 
 Dieta settimanale:
-- L'utente, attraverso i reminder di colazione, pranzo e cena costruisce la sua dieta settimanale. Nella risposta ai reminder l'utente salva il cibo nel database e vengono salvati in automatico anche i valori nutrizionali del cibo con l'api di edamame
+- L'utente, attraverso i reminder di colazione, pranzo e cena costruisce la sua dieta settimanale. Nella risposta ai reminder l'utente salva il cibo nel database e vengono salvati in automatico anche i valori nutrizionali del cibo con l'api di edamame. Inoltre, viene mandato un reminder settimanale per avvisare l'utente che è trascorsa una settimana e che deve visualizzare la sua dieta settimanale
 
 Modalità di interazione:
 - Testuale: l'utente può chiedere al chatbot qualsiasi domanda inerente al cibo.
