@@ -160,6 +160,17 @@ def create_tables(cursor, database_name):
           cibo_id INT AUTO_INCREMENT PRIMARY KEY,
           nome VARCHAR(255),
           periodo_giorno_id INT NOT NULL,
+          energy VARCHAR(255),
+          carbohydrate VARCHAR(255),
+          fiber VARCHAR(255),
+          sugars VARCHAR(255),
+          protein VARCHAR(255),
+          cholesterol VARCHAR(255),
+          sodium VARCHAR(255),
+          iron VARCHAR(255),
+          zinc VARCHAR(255),
+          phosphorus VARCHAR(255),
+          water VARCHAR(255),
           FOREIGN KEY(periodo_giorno_id) REFERENCES periodo_giorno(periodo_giorno_id)
         );
         """)

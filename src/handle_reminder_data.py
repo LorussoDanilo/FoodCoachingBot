@@ -294,8 +294,27 @@ def save_user_food_response(bot_telegram, mysql_cursor, mysql_connection, telegr
 
         # Esegui il commit delle modifiche al database
         mysql_connection.commit()
+
+        # traduzione del cibo inserito dall'utente
         translated_food = traduci_testo(food_name)
-        print(get_nutritional_info(translated_food, app_id, app_key))
+        # Inverti il dizionario
+        # Aggiungi i valori nutrizionali nella riga della tabella cibo
+        nutritional_info_items = get_nutritional_info(translated_food, app_id, app_key)
+
+        if nutritional_info_items:
+            update_query = "UPDATE cibo SET "
+            values = []
+            for key, value in nutritional_info_items:
+                update_query += f"{key} = %s, "
+                values.append(value)
+            # Rimuovi l'ultima virgola dalla stringa di query
+            update_query = update_query.rstrip(', ')
+            # Aggiungi il resto della tua query
+            update_query += " WHERE nome = %s AND periodo_giorno_id = %s"
+            # Aggiorna la riga della tabella cibo con i nuovi valori nutrizionali
+            mysql_cursor.execute(update_query, values + [food_name, periodo_giorno_id])
+            # Esegui il commit delle modifiche al database
+            mysql_connection.commit()
 
         return bot_telegram.send_message(telegram_id,
                                          f"{meal_type} inserito/a correttamente! Ora puoi chiedermi ciò che desideri 😊")
@@ -320,31 +339,57 @@ def get_nutritional_info(food_name, app_id, app_key):
     :rtype: str
     """
 
-    base_url = "https://api.edamam.com/api/nutrition-data"
+    try:
+        base_url = "https://api.edamam.com/api/nutrition-data"
 
-    # Costruisci i parametri della richiesta
-    params = {
-        'app_id': app_id,
-        'app_key': app_key,
-        'ingr': food_name
-    }
+        # Costruisci i parametri della richiesta
+        params = {
+            'app_id': app_id,
+            'app_key': app_key,
+            'ingr': food_name
+        }
 
-    # Esegui la richiesta all'API di Edamam
-    response = requests.get(base_url, params=params)
+        # Esegui la richiesta all'API di Edamam
+        response = requests.get(base_url, params=params)
 
-    # Verifica se la richiesta è stata eseguita con successo (status code 200)
-    if response.status_code == 200:
-        data = response.json()
+        # Verifica se la richiesta è stata eseguita con successo (status code 200)
+        if response.status_code == 200:
+            data = response.json()
 
-        # Estrai i valori nutrizionali
-        if 'totalNutrients' in data:
-            nutrients = data['totalNutrients']
-            for nutrient in nutrients.values():
-                print(f"{nutrient['label']}: {nutrient['quantity']} {nutrient['unit']}")
+            # Estrai solo i valori nutrizionali desiderati
+            selected_nutrients = {
+                'Energy': '',
+                'Carbohydrate': '',
+                'Fiber': '',
+                'Sugars': '',
+                'Protein': '',
+                'Cholesterol': '',
+                'Sodium': '',
+                'Iron': '',
+                'Zinc': '',
+                'Phosphorus': '',
+                'Water': ''
+            }
+
+            if 'totalNutrients' in data:
+                nutrients = data['totalNutrients']
+                for nutrient in nutrients.values():
+                    nutrient_label = nutrient.get('label', '').split(',')[0].strip()
+                    nutrient_quantity = nutrient.get('quantity', '')
+                    nutrient_unit = nutrient.get('unit', '')
+                    if nutrient_label in selected_nutrients:
+                        selected_nutrients[nutrient_label] = f"{nutrient_quantity} {nutrient_unit}"
+
+                return selected_nutrients.items()  # Spostato fuori dal ciclo
+
+
         else:
-            print("Valori nutrizionali non disponibili.")
-    else:
-        print(f"Errore nella richiesta API: {response.status_code}")
+            print(f"Errore nella richiesta API: {response.status_code}")
+            return None
+
+    except Exception as e:
+        print(f"Errore durante l'elaborazione delle informazioni nutrizionali: {e}")
+        return None
 
 
 def traduci_testo(testo):

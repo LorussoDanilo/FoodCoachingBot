@@ -57,7 +57,7 @@ def write_chatgpt(openai, message, profilo_utente, mysql_cursor, telegram_id):
             f"La mia età è: {eta} | La mia malattia o disturbo è: {', '.join(malattie)} | Io quando mangio o penso al "
             f"cibo provo un sentimento: {emozione}"f" | {dieta_settimanale_text}"
             f" | Mettiti nei panni di un nutrizionista,tieni conto della mia età, delle mie malattie o disturbi, "
-            f"l'emozione che provo quando mangio o penso al cibo e alla mia dieta settimanale"
+            f"l'emozione che provo quando mangio o penso al cibo e alla mia dieta settimanale considerando anche i valori nutrizionali dei cibi"
             f" e adatta il tuo linguaggio "
             f"prima di rispondere alla seguente domanda:"
             f" |\n{message_text}"
@@ -114,7 +114,9 @@ def get_dieta_settimanale_info(cursor, telegram_id):
     try:
         # Esegui la query per ottenere le informazioni sulla dieta settimanale dell'utente
         cursor.execute("""
-            SELECT ds.dieta_settimanale_id, ds.data, gs.nome AS nome_giorno, pg.nome AS nome_periodo, c.nome AS nome_cibo
+            SELECT ds.dieta_settimanale_id, ds.data, gs.nome, c.energy, c.carbohydrate, c.fiber, c.sugars, c.protein, 
+            c.cholesterol, c.sodium, c.iron, c.zinc, c.phosphorus, c.water
+            AS nome_giorno, pg.nome AS nome_periodo, c.nome AS nome_cibo
             FROM dieta_settimanale ds
             JOIN giorno_settimana gs ON ds.dieta_settimanale_id = gs.dieta_settimanale_id
             JOIN periodo_giorno pg ON gs.giorno_settimana_id = pg.giorno_settimana_id
@@ -126,25 +128,31 @@ def get_dieta_settimanale_info(cursor, telegram_id):
         # Ottieni tutti i risultati delle query
         results = cursor.fetchall()
 
-        # TODO:Fare la query per ottenere il nome del cibo dall'id nella tabella dei valori nutrizionali Poi mettere
-        #  i risultati della query in una variabile
 
         # Creare una struttura dati per memorizzare le informazioni
         dieta_settimanale_info = []
 
         # Processa i risultati della query e popola la struttura dati
         for result in results:
-            dieta_settimanale_id, data, nome_giorno, nome_periodo, nome_cibo = result
-
-            # TODO: Creare una lista con i risultati della query per i valori nutrizionali ed aggiungere gli elementi
-            #  della lista con .append qui sotto
+            dieta_settimanale_id, data, nome_giorno, nome_periodo, nome_cibo, energy, carbohydrate, fiber, sugars, protein, cholesterol, sodium, iron, zinc, phosphorus, water = result
 
             dieta_settimanale_info.append({
                 'dieta_settimanale_id': dieta_settimanale_id,
                 'data': data,
                 'nome_giorno': nome_giorno,
                 'nome_periodo': nome_periodo,
-                'nome_cibo': nome_cibo
+                'nome_cibo': nome_cibo,
+                'energy': energy,
+                'carbohydrate': carbohydrate,
+                'fiberc': fiber,
+                'sugars': sugars,
+                'protein': protein,
+                'cholesterol': cholesterol,
+                'sodium': sodium,
+                'iron': iron,
+                'zinc': zinc,
+                'phosphorus': phosphorus,
+                'water': water
             })
 
         return dieta_settimanale_info
