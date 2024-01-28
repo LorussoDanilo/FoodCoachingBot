@@ -12,16 +12,16 @@ Guida installazione:
 
 Generazione documentazione:
  - pip install sphinx_rtd_theme
- - cd docs
- - sphinx-quickstart
- - Modificare il file di configurazione Sphinx (conf.py) aggiungendo questa linea di codice: sys.path.insert(0, os.path.abspath('..'))
- - extensions = ['sphinx.ext.autodoc','sphinx.ext.viewcode','sphinx.ext.napoleon',]
- - cd ..
  - sphinx-apidoc -o docs src/
- - modificare il file modules.rst scrivendo sotto a Contents: modules
+ -  cd docs
+ - sphinx-quickstart
+ - modificare il file index.rst scrivendo sotto a Contents: modules
+ - Attenzione al path nei file .rst per l'automodule. In questo caso il path sarà, esempio: src.handle_reminder_data
+ - Modificare il file di configurazione Sphinx (conf.py) aggiungendo questa linea di codice: sys.path.insert(0, os.path.abspath('..')) e aggiungere anche html_builder = 'html'
+ - extensions = ['sphinx.ext.autodoc','sphinx.ext.viewcode','sphinx.ext.napoleon',]
  - .\make hmtl
  - .\make clean html per pulire. Poi rigenerare l'html
- - Attenzione al path nei file .rst per l'automodule. In questo caso il path sarà, esempio: src.handle_reminder_data
+ 
 
 Descrizione:
  - Chatbot telegram che ha lo scopo di fornire consigli dietetici

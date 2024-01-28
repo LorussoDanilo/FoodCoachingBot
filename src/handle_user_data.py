@@ -39,7 +39,8 @@ logging.getLogger('urllib3.connectionpool').setLevel('INFO')
 
 def create_new_user(telegram_id, username):
     """
-        Questa funzione permette di creare un nuovo utente inserendo nella tabella utenti il telegram_id e lo username di telegram
+        Questa funzione permette di creare un nuovo utente inserendo nella tabella utenti il telegram_id e lo username
+        di telegram
 
         :param telegram_id: id_telegram dell'utente ottenuto tramite i metodi della libreria telebot
         :type telegram_id: int
@@ -108,8 +109,6 @@ def get_user_profile(telegram_id):
             :rtype: dict
         """
     try:
-        # Connect to MySQL and get a cursor
-        mysql_connection, mysql_cursor = connect_mysql()
 
         # Query SQL to retrieve the user profile based on telegram_id
         mysql_cursor.execute("SELECT * FROM utenti WHERE telegram_id = %s", (telegram_id,))
@@ -132,6 +131,7 @@ def get_all_telegram_ids():
     :return: la query che recupera tutti gli id telegram degli utenti
     :rtype: collections.iterable
    """
+
     mysql_connection, mysql_cursor = connect_mysql()
     # Query SQL per recuperare tutti gli ID di Telegram dalla tabella utenti
     mysql_cursor.execute("SELECT telegram_id FROM utenti")
@@ -183,7 +183,8 @@ def ask_next_question(telegram_id, bot, questions_and_fields, index):
             :type telegram_id_update: int
             :param bot_update: permette di usare i metodi della libreria Telebot
             :type bot_update: Telebot
-            :param questions_and_fields_update: lista che contiene le domande e i campi della tabella utenti a cui si riferiscono
+            :param questions_and_fields_update: lista che contiene le domande e i campi della tabella utenti a cui
+                    si riferiscono
             :type questions_and_fields_update: list
             :param index_update: indice della domanda che viene fatta all'utente che viene incrementato ciclicamente
             :type index_update: int
@@ -224,9 +225,9 @@ def ask_next_question(telegram_id, bot, questions_and_fields, index):
 
 def voice_recognizer():
     """
-        Questa funzione permette di processare l'audio convertendolo, attraverso un programma esterno da scaricare, l'audio di telegram
-        dal formato .ogg al formato .wav. Viene salvato temporaneamente il file audio, riconosciuto il testo dalla voce con
-        la funzione di SpeechToText di GoogleApiCloudConsole, e poi cancellato.
+        Questa funzione permette di processare l'audio convertendolo, attraverso un programma esterno da scaricare,
+        l'audio di telegram dal formato .ogg al formato .wav. Viene salvato temporaneamente il file audio, riconosciuto
+         il testo dalla voce con la funzione di SpeechToText di GoogleApiCloudConsole, e poi cancellato.
 
         :return: il testo riconosciuto dal vocale
         :rtype: str

@@ -103,7 +103,7 @@ def create_database_and_table_if_not_exists(cursor, database_name):
 
 def create_tables(cursor, database_name):
     """
-        Questa funzione crea le tabelle se non esistono
+        Questa funzione crea le tabelle se non esistono.
 
         :param cursor: cursore della connessione per eseguire le query
         :type cursor: Cursor

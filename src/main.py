@@ -30,7 +30,8 @@ from src.controls import control_tag, check_time_in_range
 
 def generate_all_weekly_diets_pdf(message):
     """
-    Questa funzione serve per gestire il comando dashboard e genera un pdf con il plot delle diete settimanali dell'utente
+    Questa funzione serve per gestire il comando dashboard e genera un pdf con il plot delle diete settimanali
+    dell'utente
 
     :type message: Message
 
@@ -54,7 +55,8 @@ def show_user_profile(message):
 
 def send_welcome(message):
     """
-    Questa funzione serve per gestire il comando start ed invia il messaggio di info. Successivamente avvia la profilazione
+    Questa funzione serve per gestire il comando start ed invia il messaggio di info. Successivamente avvia la
+    profilazione
     nuovamente all'utente le domande di profilazione
 
     :type message: Message
@@ -94,11 +96,12 @@ def handle_reminder_response_copy(message):
 
 def handle_profile_response_copy(message):
     """
-    Questa funzione serve per gestire le risposte dell'utente alle domande della profilazione salvando le risposte nel database.
-    Inoltre, gestisce anche la conversazione post-profilazione attraverso l'utilizzo di un indice che determina l'inizio e la fine
-    delle domande per la profilazione. Vengono accettate dopo la profilazione in input, messaggi testuali, vocali e fotografie.
-    E' possibile anche rispondere ai messaggi di risposta ai reminder permettendo all'utente di fare delle opportune domande
-    per gli alimenti nella data del messaggio a cui sta rispondendo.
+    Questa funzione serve per gestire le risposte dell'utente alle domande della profilazione salvando le risposte nel
+     database.
+    Inoltre, gestisce anche la conversazione post-profilazione attraverso l'utilizzo di un indice che determina l'inizio
+     e la fine delle domande per la profilazione. Vengono accettate dopo la profilazione in input, messaggi testuali,
+     vocali e fotografie. E' possibile anche rispondere ai messaggi di risposta ai reminder permettendo all'utente
+     di fare delle opportune domande per gli alimenti nella data del messaggio a cui sta rispondendo.
     Questa è una funzione di copia poichè il message handler non viene letto dalla pydoc
 
     :type message: Message
@@ -175,9 +178,9 @@ index = 0
 # Inizializzazione degli intervalli orari per inviare i reminder
 ORA_COLAZIONE_START = time(8, 0)
 ORA_COLAZIONE_END = time(9, 0)
-ORA_PRANZO_START = time(12, 0)
-ORA_PRANZO_END = time(16, 0)
-ORA_CENA_START = time(17, 0)
+ORA_PRANZO_START = time(11, 0)
+ORA_PRANZO_END = time(12, 0)
+ORA_CENA_START = time(12, 30)
 ORA_CENA_END = time(23, 50)
 
 ORA_REMINDER_SETTIMANALE = time(11, 13, 10)
@@ -193,7 +196,8 @@ if __name__ == '__main__':
     @bot_telegram.message_handler(commands=[DASHBOARD_COMMAND])
     def generate_all_weekly_diets_pdf(message):
         """
-            Questa funzione serve per gestire il comando dashboard e genera un pdf con il plot delle diete settimanali dell'utente
+            Questa funzione serve per gestire il comando dashboard e genera un pdf con il plot delle diete settimanali
+            dell'utente
 
             :type message: Message
 
@@ -203,7 +207,7 @@ if __name__ == '__main__':
         telegram_id = message.chat.id
         dieta_dates = get_dieta_dates_by_telegram_id(telegram_id, mysql_cursor)
 
-        user_profile = get_user_profile(telegram_id)
+        user_profile = get_user_profile(mysql_cursor)
 
         # Creazione del PDF
         buffer = io.BytesIO()
@@ -287,7 +291,6 @@ if __name__ == '__main__':
         buffer.seek(0)
         return buffer
 
-
     # metodo per gestire il comando /profilo per visualizzare i dati del profilo
     @bot_telegram.message_handler(commands=[PROFILO_COMMAND])
     def show_user_profile(message):
@@ -316,7 +319,6 @@ if __name__ == '__main__':
         else:
             # Messaggio se l'utente non ha un profilo
             bot_telegram.send_message(telegram_id, "Non hai ancora completato il tuo profilo.")
-
 
     # Metodo per gestire il comando /modifica
     @bot_telegram.message_handler(commands=[EDIT_COMMAND])
@@ -348,13 +350,12 @@ if __name__ == '__main__':
             ORA_CENA_START, ORA_CENA_END,))
         reminder_message_thread.start()
 
-
     # Metodo per gestire il comando /start
     @bot_telegram.message_handler(commands=[START_COMMAND])
     def send_welcome(message):
         """
-        Questa funzione serve per gestire il comando start ed invia il messaggio di info. Successivamente avvia la profilazione
-        nuovamente all'utente le domande di profilazione
+        Questa funzione serve per gestire il comando start ed invia il messaggio di info. Successivamente avvia
+        la profilazione nuovamente all'utente le domande di profilazione
 
         :type message: Message
 
@@ -369,11 +370,12 @@ if __name__ == '__main__':
 
         user_profile_start = get_user_profile(telegram_id)
         print(user_profile_start)
+        username = message.chat.username
 
         # Controllo se l'utente non esiste
         if not user_profile_start:
             # Se l'utente non esiste viene creato inserendo l'id telegram e il suo username
-            create_new_user(mysql_cursor, mysql_connection)
+            create_new_user(telegram_id, username)
 
         # Tutte le informazioni necessarie sono state fornite
         msg = control_tag(root, "./telegram/informazioni", START_COMMAND, "spiegazioni")
@@ -393,11 +395,12 @@ if __name__ == '__main__':
     @bot_telegram.message_handler(func=lambda message: True, content_types=['text', 'voice', 'photo'])
     def handle_profile_response(message):
         """
-        Questa funzione serve per gestire le risposte dell'utente alle domande della profilazione salvando le risposte nel database.
-        Inoltre, gestisce anche la conversazione post-profilazione attraverso l'utilizzo di un indice che determina l'inizio e la fine
-        delle domande per la profilazione. Vengono accettate dopo la profilazione in input, messaggi testuali, vocali e fotografie.
-        E' possibile anche rispondere ai messaggi di risposta ai reminder permettendo all'utente di fare delle opportune domande
-        per gli alimenti nella data del messaggio a cui sta rispondendo
+        Questa funzione serve per gestire le risposte dell'utente alle domande della profilazione salvando le risposte
+        nel database. Inoltre, gestisce anche la conversazione post-profilazione attraverso l'utilizzo di un indice
+        che determina l'inizio e la fine delle domande per la profilazione. Vengono accettate dopo la profilazione
+        in input, messaggi testuali, vocali e fotografie. E' possibile anche rispondere ai messaggi di risposta
+        ai reminder permettendo all'utente di fare delle opportune domande per gli alimenti nella data del
+        messaggio a cui sta rispondendo
 
         :type message: Message
 
@@ -438,13 +441,18 @@ if __name__ == '__main__':
 
                 for telegram_id in telegram_ids:
                     if check_time_in_range(current_time_reminder, ORA_COLAZIONE_START, ORA_COLAZIONE_END):
-                        bot_telegram.send_message(telegram_id, "Buongiorno! Cosa hai mangiato a colazione? Indica prima del cibo la quantità.")
+                        bot_telegram.send_message(telegram_id,
+                                                  "Buongiorno! Cosa hai mangiato a colazione? Indica prima del cibo "
+                                                  "la quantità.")
 
                     elif check_time_in_range(current_time_reminder, ORA_PRANZO_START, ORA_PRANZO_END):
-                        bot_telegram.send_message(telegram_id, "Pranzo time! Cosa hai mangiato a pranzo? Indica prima del cibo la quantità.")
+                        bot_telegram.send_message(telegram_id,
+                                                  "Pranzo time! Cosa hai mangiato a pranzo? Indica prima del cibo la "
+                                                  "quantità.")
 
                     elif check_time_in_range(current_time_reminder, ORA_CENA_START, ORA_CENA_END):
-                        bot_telegram.send_message(telegram_id, "Cena! Cosa hai mangiato a cena? Indica prima del cibo la quantità.")
+                        bot_telegram.send_message(telegram_id,
+                                                  "Cena! Cosa hai mangiato a cena? Indica prima del cibo la quantità.")
                     else:
                         event.clear()
 
