@@ -1,9 +1,9 @@
 """
-Questo modulo contiene le funzioni che servono per passare i messaggi degli utenti a chatgpt applicando i filtri conversazionali
+Questo modulo contiene le funzioni che servono per passare i messaggi degli utenti a chatgpt applicando i
+filtri conversazionali
 
     Danilo Lorusso - Version 1.0
 """
-
 
 import locale
 
@@ -126,8 +126,8 @@ def get_dieta_settimanale_info(cursor, telegram_id):
         # Ottieni tutti i risultati delle query
         results = cursor.fetchall()
 
-        #Fare la query per ottenere il nome del cibo dall'id nella tabella dei valori nutrizionali
-        #Poi mettere i risultati della query in una variabile
+        # TODO:Fare la query per ottenere il nome del cibo dall'id nella tabella dei valori nutrizionali Poi mettere
+        #  i risultati della query in una variabile
 
         # Creare una struttura dati per memorizzare le informazioni
         dieta_settimanale_info = []
@@ -135,7 +135,9 @@ def get_dieta_settimanale_info(cursor, telegram_id):
         # Processa i risultati della query e popola la struttura dati
         for result in results:
             dieta_settimanale_id, data, nome_giorno, nome_periodo, nome_cibo = result
-            # Creare una lista con i risultati della query per i valori nutrizionali ed aggiungere gli elementi della lista con .append qui sotto
+
+            # TODO: Creare una lista con i risultati della query per i valori nutrizionali ed aggiungere gli elementi
+            #  della lista con .append qui sotto
 
             dieta_settimanale_info.append({
                 'dieta_settimanale_id': dieta_settimanale_id,

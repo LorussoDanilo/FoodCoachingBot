@@ -43,7 +43,8 @@ def correct_text_xml(function):
     L'obiettivo apparente di questo decoratore è pulire il testo in input, rimuovendo gli spazi bianchi iniziali,
     gestendo il caso in cui una riga è vuota, e sostituendo _bn_ con un carattere di nuova riga.
 
-    :param function: Prende come argomento una funzione (function). Il suo scopo principale è eseguire delle operazioni aggiuntive sul testo in input.
+    :param function: Prende come argomento una funzione (function). Il suo scopo principale è eseguire delle operazioni
+            aggiuntive sul testo in input.
     :type function:
 
     :return: restituisce una nuova funzione (wrapper)
