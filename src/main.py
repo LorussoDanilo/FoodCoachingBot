@@ -33,8 +33,7 @@ from src.handle_user_data import get_user_profile, create_new_user, ask_next_que
 
 def generate_all_weekly_diets_pdf(message):
     """
-    Questa funzione serve per gestire il comando dashboard e genera un pdf con il plot delle diete settimanali
-    dell'utente
+    Questa funzione serve per gestire il comando dashboard e genera un pdf con il plot delle diete settimanali dell'utente
 
     :type message: Message
 
@@ -58,9 +57,8 @@ def show_user_profile(message):
 
 def send_welcome(message):
     """
-    Questa funzione serve per gestire il comando start ed invia il messaggio di info. Successivamente avvia la
-    profilazione
-    nuovamente all'utente le domande di profilazione
+    Questa funzione serve per gestire il comando /start ed invia il messaggio di info. Successivamente avvia la
+    profilazione nuovamente all'utente le domande di profilazione
 
     :type message: Message
 
@@ -72,7 +70,7 @@ def send_welcome(message):
 
 def edit_command(message):
     """
-    Questa funzione serve per gestire il comando profilo e permette di modificare i dati del profilo ponendo
+    Questa funzione serve per gestire il comando /modifica e permette di modificare i dati del profilo ponendo
     nuovamente all'utente le domande di profilazione
 
     :type message: Message
@@ -100,11 +98,11 @@ def handle_reminder_response_copy(message):
 def handle_profile_response_copy(message):
     """
     Questa funzione serve per gestire le risposte dell'utente alle domande della profilazione salvando le risposte nel
-     database.
+    database.
     Inoltre, gestisce anche la conversazione post-profilazione attraverso l'utilizzo di un indice che determina l'inizio
-     e la fine delle domande per la profilazione. Vengono accettate dopo la profilazione in input, messaggi testuali,
-     vocali e fotografie. E' possibile anche rispondere ai messaggi di risposta ai reminder permettendo all'utente
-     di fare delle opportune domande per gli alimenti nella data del messaggio a cui sta rispondendo.
+    e la fine delle domande per la profilazione. Vengono accettate dopo la profilazione in input, messaggi testuali,
+    vocali e fotografie. E' possibile anche rispondere ai messaggi di risposta ai reminder permettendo all'utente
+    di fare delle opportune domande per gli alimenti nella data del messaggio a cui sta rispondendo.
     Questa è una funzione di copia poichè il message handler non viene letto dalla pydoc
 
     :type message: Message

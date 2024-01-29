@@ -7,7 +7,8 @@ Guida installazione:
 - Spostarsi nella directory *\venv\Scripts* e digitare il comando *activate*
 - Scaricare lo zip da: https://github.com/BtbN/FFmpeg-Builds/releases. Questo programma è necessario per convertire i file audio da .ogg a .wav
 - Scaricare il file JSon delle credenziali di google cloud platform (nel .env inserire il path dove si trova questo file )
-- Generare la chiave per l'API di chatgpt
+- Generare la chiave per l'API di chatgpt, edamam e roboflow
+- Creare file .env ed inserire le informazioni presenti in env.example
 
 
 Generazione documentazione:

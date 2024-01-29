@@ -1,7 +1,6 @@
 """
 Questo modulo contiene le funzioni che servono per gestire l'invio dei reminder e il successivo salvataggio nel database
- delle risposte
-degli utenti dopo i reminder
+ delle risposte degli utenti dopo i reminder
 
     Danilo Lorusso - Version 1.0
 """

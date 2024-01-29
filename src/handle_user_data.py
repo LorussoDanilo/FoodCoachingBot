@@ -279,12 +279,12 @@ def ask_next_question(telegram_id, bot, questions_and_fields, index):
 
 def voice_recognizer():
     """
-        Questa funzione permette di processare l'audio convertendolo, attraverso un programma esterno da scaricare,
-        l'audio di telegram dal formato .ogg al formato .wav. Viene salvato temporaneamente il file audio, riconosciuto
-         il testo dalla voce con la funzione di SpeechToText di GoogleApiCloudConsole, e poi cancellato.
+    Questa funzione permette di processare l'audio convertendolo, attraverso un programma esterno da scaricare,
+    l'audio di telegram dal formato .ogg al formato .wav. Viene salvato temporaneamente il file audio, riconosciuto
+    il testo dalla voce con la funzione di SpeechToText di GoogleApiCloudConsole, e poi cancellato.
 
-        :return: il testo riconosciuto dal vocale
-        :rtype: str
+    :return: il testo riconosciuto dal vocale
+    :rtype: str
     """
 
     ffmpeg_path = os.getenv('FFMPEG_PATH')
