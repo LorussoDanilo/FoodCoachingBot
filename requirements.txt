@@ -37,3 +37,5 @@ SpeechRecognition
 deep-translator
 
 
+
+pillow~=10.2.0

@@ -125,6 +125,59 @@ def get_user_profile(telegram_id):
         print(f"Error getting user profile: {e}")
 
 
+# Funzione per ottenere gli ID delle diete settimanali per un utente
+def get_dieta_settimanale_ids(telegram_id):
+    """
+    Questa funzione permette di ottenere tutti gli delle diete settimanali attraverso l'id telegram
+
+    :param telegram_id: telegram_id dell'utente
+    :type telegram_id: int
+
+    :return: il risultato della query per ottenere tutti gli id settimanali
+    :rtype: list
+    """
+    mysql_connection, mysql_cursor = connect_mysql()
+    try:
+        mysql_cursor.execute("SELECT dieta_settimanale_id FROM dieta_settimanale WHERE telegram_id = %s",
+                             (telegram_id,))
+        result = mysql_cursor.fetchall()
+        return [row[0] for row in result]
+    except Exception as e:
+        print(f"Errore nel recupero degli ID delle diete settimanali: {e}")
+    finally:
+        mysql_cursor.close()
+        mysql_connection.close()
+
+
+def get_dieta_settimanale_profile(dieta_settimanale_id):
+    """
+    Questa funzione permette di ottenere tutti i dati della dieta settimanale in base all'id della dieta settimanale.
+
+    :param dieta_settimanale_id: id della dieta settimanale
+    :type dieta_settimanale_id: int
+
+    :return: la query che recupera i dati della dieta settimanale nella tabella dieta_settimanale
+    :rtype: dict
+    """
+    mysql_connection, mysql_cursor = connect_mysql()
+    try:
+
+        # Query SQL to retrieve the dieta settimanale profile based on dieta_settimanale_id
+        mysql_cursor.execute("SELECT * FROM dieta_settimanale WHERE dieta_settimanale_id = %s", (dieta_settimanale_id,))
+        result = mysql_cursor.fetchone()
+
+        # Close the cursor
+        mysql_cursor.close()
+
+        # Return the dieta settimanale profile if present, otherwise an empty dictionary
+        return dict(zip(mysql_cursor.column_names, result)) if result else {}
+
+    except Exception as e:
+        print(f"Error getting dieta settimanale profile: {e}")
+    finally:
+        mysql_connection.close()
+
+
 def get_all_telegram_ids():
     """
     Questa funzione permette di ottenere tutti gli id telegram degli utenti

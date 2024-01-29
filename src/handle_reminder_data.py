@@ -382,7 +382,6 @@ def get_nutritional_info(food_name, app_id, app_key):
 
                 return selected_nutrients.items()  # Spostato fuori dal ciclo
 
-
         else:
             print(f"Errore nella richiesta API: {response.status_code}")
             return None

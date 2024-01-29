@@ -57,7 +57,8 @@ def write_chatgpt(openai, message, profilo_utente, mysql_cursor, telegram_id):
             f"La mia età è: {eta} | La mia malattia o disturbo è: {', '.join(malattie)} | Io quando mangio o penso al "
             f"cibo provo un sentimento: {emozione}"f" | {dieta_settimanale_text}"
             f" | Mettiti nei panni di un nutrizionista,tieni conto della mia età, delle mie malattie o disturbi, "
-            f"l'emozione che provo quando mangio o penso al cibo e alla mia dieta settimanale considerando anche i valori nutrizionali dei cibi"
+            f"l'emozione che provo quando mangio o penso al cibo e alla mia dieta settimanale considerando anche"
+            f" i valori nutrizionali dei cibi"
             f" e adatta il tuo linguaggio "
             f"prima di rispondere alla seguente domanda:"
             f" |\n{message_text}"
@@ -99,6 +100,76 @@ def write_chatgpt(openai, message, profilo_utente, mysql_cursor, telegram_id):
         return "Si è verificato un errore durante la generazione della risposta."
 
 
+def write_chatgpt_for_dieta_info(openai, profilo_utente, mysql_cursor, telegram_id):
+    """
+    Questa funzione serve per passare i messaggi dell'utente a chatgpt filtrandole con is_food_question e passando
+    a chatgpt anche il profilo dell'utente e la dieta settimanale
+
+    :param openai: api key di openai
+    :type openai: ChatCompletion
+    :param profilo_utente: dati del profilo utente
+    :type profilo_utente: dict
+    :param mysql_cursor: cursore per eseguire le query
+    :type mysql_cursor: execute, fetchall
+    :param telegram_id: telegram_id dell'utente
+    :type telegram_id: int
+
+    :return: la risposta data da chatgpt
+    :rtype: str
+    """
+
+    dieta_settimanale_text = ""
+
+    try:
+        # Estrai le informazioni dal profilo dell'utente
+        eta = profilo_utente.get('eta')
+        malattie = profilo_utente.get('malattie')
+        emozione = profilo_utente.get('emozione')
+
+        dieta_settimanale_info = get_dieta_settimanale_info(mysql_cursor, telegram_id)
+
+        if dieta_settimanale_info:
+            # Costruisci una rappresentazione testuale delle diete settimanali
+            dieta_settimanale_text = f"La mia dieta settimanale è la seguente:\n" + dieta_settimanale_info.__str__()
+
+        # Costruisci il messaggio di input per ChatGPT senza utilizzare il messaggio dell'utente
+        input_con_profilo_e_dieta = (
+            f"La mia età è: {eta} | La mia malattia o disturbo è: {', '.join(malattie)} | Io quando mangio o penso al "
+            f"cibo provo un sentimento: {emozione}"f" | {dieta_settimanale_text}"
+            f" | Mettiti nei panni di un nutrizionista,tieni conto della mia età, delle mie malattie o disturbi,"
+            f" l'emozione che provo quando mangio o penso al cibo e alla mia dieta settimanale considerando anche"
+            f" i valori nutrizionali dei cibi e adatta il tuo linguaggio. "
+            f"Dammi un brevissimo feedback sulla mia dieta settimanale considerando le informazioni che ti ho fornito."
+            f" Ricorda che mi devi rispondere solo con si hai seguito una dieta corretta oppure no, non hai seguito una"
+            f" dieta corretta, accompagnati da una sola frase"
+        )
+        print(input_con_profilo_e_dieta)
+
+        # Invia la richiesta a OpenAI con le informazioni del profilo e della dieta
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "user", "content": input_con_profilo_e_dieta}
+            ]
+        )
+
+        # Verifica se la risposta è valida e contiene contenuti
+        if response and "choices" in response and response["choices"]:
+            # Ottieni la risposta grezza da OpenAI
+            raw_response = response["choices"][0]["message"]["content"]
+            print(raw_response)
+
+            return raw_response
+        else:
+            # Gestisci risposte vuote o inaspettate
+            return "Mi dispiace, non ho ricevuto una risposta valida da OpenAI."
+
+    except Exception as e:
+        # Registra eventuali eccezioni che potrebbero verificarsi
+        print(f"Si è verificato un errore in write_chatgpt: {e}")
+        return "Si è verificato un errore durante la generazione della risposta."
+
+
 def get_dieta_settimanale_info(cursor, telegram_id):
     """
         Questa funzione serve per recuperare i dati delle diete settimanali svolte dall'utente
@@ -128,13 +199,13 @@ def get_dieta_settimanale_info(cursor, telegram_id):
         # Ottieni tutti i risultati delle query
         results = cursor.fetchall()
 
-
         # Creare una struttura dati per memorizzare le informazioni
         dieta_settimanale_info = []
 
         # Processa i risultati della query e popola la struttura dati
         for result in results:
-            dieta_settimanale_id, data, nome_giorno, nome_periodo, nome_cibo, energy, carbohydrate, fiber, sugars, protein, cholesterol, sodium, iron, zinc, phosphorus, water = result
+            (dieta_settimanale_id, data, nome_giorno, nome_periodo, nome_cibo, energy, carbohydrate, fiber,
+             sugars, protein, cholesterol, sodium, iron, zinc, phosphorus, water) = result
 
             dieta_settimanale_info.append({
                 'dieta_settimanale_id': dieta_settimanale_id,

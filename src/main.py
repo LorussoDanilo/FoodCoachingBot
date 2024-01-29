@@ -4,28 +4,31 @@ Questo modulo contiene i vari handler dei messagi dell'utente e la gestione dei 
     Danilo Lorusso - Version 1.0
 """
 
-import io
 import locale
 import os
 import pickle
 import threading
 from datetime import datetime, time
+from io import BytesIO
 from queue import Queue
 
+import matplotlib.pyplot as plt
 import pandas as pd
+from PIL import Image
 from dotenv import load_dotenv
-from matplotlib import pyplot as plt
 from mysql.connector import IntegrityError, errorcode
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.pdfgen import canvas
-from telebot.types import InputFile
+from reportlab.platypus import Paragraph
 
-from src.chatGPT_response import write_chatgpt
-from src.handle_reminder_data import save_user_food_response, get_food_for_day, get_dieta_dates_by_telegram_id, \
-    send_reminder_message, send_week_reminder_message
-from src.handle_user_data import get_user_profile, create_new_user, ask_next_question, get_all_telegram_ids, \
-    voice_recognizer, _clear, photo_recognizer
+from src.chatGPT_response import write_chatgpt, write_chatgpt_for_dieta_info
 from src.connection import connect, connect_mysql
 from src.controls import control_tag, check_time_in_range
+from src.handle_reminder_data import save_user_food_response, send_reminder_message, send_week_reminder_message
+from src.handle_user_data import get_user_profile, create_new_user, ask_next_question, get_all_telegram_ids, \
+    voice_recognizer, _clear, photo_recognizer, get_dieta_settimanale_ids, \
+    get_dieta_settimanale_profile
 
 
 def generate_all_weekly_diets_pdf(message):
@@ -180,7 +183,7 @@ ORA_COLAZIONE_START = time(8, 0)
 ORA_COLAZIONE_END = time(9, 0)
 ORA_PRANZO_START = time(11, 0)
 ORA_PRANZO_END = time(12, 0)
-ORA_CENA_START = time(16, 30)
+ORA_CENA_START = time(12, 30)
 ORA_CENA_END = time(23, 50)
 
 ORA_REMINDER_SETTIMANALE = time(11, 13, 10)
@@ -204,92 +207,171 @@ if __name__ == '__main__':
             :return: pdf con i dati delle diete settimanali
             :rtype: BytesIO
         """
+        global mysql_connection, mysql_cursor
         telegram_id = message.chat.id
-        dieta_dates = get_dieta_dates_by_telegram_id(telegram_id, mysql_cursor)
+        user_profile = get_user_profile(telegram_id)
+        dieta_settimanale_ids = get_dieta_settimanale_ids(telegram_id)
 
-        user_profile = get_user_profile(mysql_cursor)
+        for ds_id in dieta_settimanale_ids:
+            # Query per ottenere i dati
+            query_colazione = """
+                   SELECT gs.nome AS giorno, CAST(c.energy AS DECIMAL(10, 2))
+                   FROM giorno_settimana gs
+                   JOIN periodo_giorno pg ON gs.giorno_settimana_id = pg.giorno_settimana_id
+                   JOIN cibo c ON pg.periodo_giorno_id = c.periodo_giorno_id
+                   WHERE pg.nome = 'Colazione';
+                   """
 
-        # Creazione del PDF
-        buffer = io.BytesIO()
-        pdf = canvas.Canvas(buffer)
+            query_pranzo = """
+                   SELECT gs.nome AS giorno, CAST(c.energy AS DECIMAL(10, 2))
+                   FROM giorno_settimana gs
+                   JOIN periodo_giorno pg ON gs.giorno_settimana_id = pg.giorno_settimana_id
+                   JOIN cibo c ON pg.periodo_giorno_id = c.periodo_giorno_id
+                   WHERE pg.nome = 'Pranzo';
+                   """
 
-        # Informazioni utente
-        pdf.drawString(100, 800, 'Informazioni Utente:')
-        table_data = [
-            ['Nome Utente', 'Età', 'Malattie', 'Emozione'],
-            [user_profile.get('nome_utente'), user_profile.get('eta'), user_profile.get('malattie'),
-             user_profile.get('emozione')]
-        ]
-        info_utente = pd.DataFrame(table_data)
+            query_cena = """
+                   SELECT gs.nome AS giorno, CAST(c.energy AS DECIMAL(10, 2))
+                   FROM giorno_settimana gs
+                   JOIN periodo_giorno pg ON gs.giorno_settimana_id = pg.giorno_settimana_id
+                   JOIN cibo c ON pg.periodo_giorno_id = c.periodo_giorno_id
+                   WHERE pg.nome = 'Cena';
+                   """
 
-        table_style = [('BACKGROUND', (0, 0), (-1, 0), 'grey'),
-                       ('TEXTCOLOR', (0, 0), (-1, 0), 'white'),
-                       ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-                       ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-                       ('BOTTOMPADDING', (0, 0), (-1, 0), 12)]
+            query_totale_calorie = """
+                   SELECT gs.nome AS giorno, SUM(CAST(c.energy AS DECIMAL(10, 2))) AS totale_calorie
+                   FROM giorno_settimana gs
+                   JOIN periodo_giorno pg ON gs.giorno_settimana_id = pg.giorno_settimana_id
+                   JOIN cibo c ON pg.periodo_giorno_id = c.periodo_giorno_id
+                   GROUP BY gs.nome;
+                   """
 
-        # Creare una lista di dizionari per ogni stile
-        styles = []
-        for style in table_style:
-            props = [(style[0], style[2])]
+            # Esegui le query
+            mysql_cursor.execute(query_colazione)
+            data_colazione = mysql_cursor.fetchall()
 
-            # Aggiungi gli elementi solo se presenti nella tupla
-            if len(style) >= 4:
-                props.append(('color', style[3]))
-            if len(style) >= 5:
-                props.append(('text-align', style[4]))
-            if len(style) >= 6:
-                props.append(('font-name', style[5]))
-            if len(style) >= 7:
-                props.append(('bottom-padding', style[6]))
+            mysql_cursor.execute(query_pranzo)
+            data_pranzo = mysql_cursor.fetchall()
 
-            styles.append({'selector': 'tr', 'props': props})
+            mysql_cursor.execute(query_cena)
+            data_cena = mysql_cursor.fetchall()
 
-        # Applica lo stile al DataFrame e assegna il risultato a styled_info_utente
-        styled_info_utente = info_utente.style.set_table_styles(styles)
+            mysql_cursor.execute(query_totale_calorie)
+            data_totale_calorie = mysql_cursor.fetchall()
 
-        pdf.drawString(100, 700, 'Dieta Settimanale:')
+            # Chiudi la connessione al datab
+            # ase
+            mysql_connection.close()
+            dieta_settimanale = get_dieta_settimanale_profile(ds_id)
 
-        # Itera attraverso tutte le settimane
-        for dieta_data in dieta_dates:
-            pdf.drawString(100, 680, f'Settimana del {dieta_data}')
+            # Trasforma i dati in DataFrame
+            df_colazione = pd.DataFrame(data_colazione, columns=['Giorno', 'Calorie Colazione'])
+            df_pranzo = pd.DataFrame(data_pranzo, columns=['Giorno', 'Calorie Pranzo'])
+            df_cena = pd.DataFrame(data_cena, columns=['Giorno', 'Calorie Cena'])
+            df_totale_calorie = pd.DataFrame(data_totale_calorie, columns=['Giorno', 'Totale Calorie'])
 
-            # Creazione del plot per la settimana corrente
-            plt.figure(figsize=(10, 6))
-            giorni_settimana = ["Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato", "Domenica"]
+            # Crea i grafici senza mostrare la GUI
+            plt.figure(figsize=(15, 10))
 
-            for giorno in giorni_settimana:
-                cibi_giorno = get_food_for_day(telegram_id, dieta_data, giorno, mysql_cursor)
-                calorie_cibi = [cibo['calorie'] for cibo in cibi_giorno]
-                plt.plot(calorie_cibi, label=giorno)
+            # Grafico Colazione
+            plt.subplot(221)
+            plt.bar(df_colazione['Giorno'], df_colazione['Calorie Colazione'])
+            plt.title('Kcal durante la colazione')
+            plt.savefig('colazione.png')
 
-            plt.xlabel('Periodo del Giorno')
-            plt.ylabel('Calorie')
-            plt.title('Dieta Settimanale')
-            plt.legend()
-            plt.savefig('weekly_diet_plot.png')
+            # Grafico Pranzo
+            plt.subplot(222)
+            plt.bar(df_pranzo['Giorno'], df_pranzo['Calorie Pranzo'])
+            plt.title('Kcal durante il pranzo')
+            plt.savefig('pranzo.png')
+
+            # Grafico Cena
+            plt.subplot(223)
+            plt.bar(df_cena['Giorno'], df_cena['Calorie Cena'])
+            plt.title('Kcal durante la cena')
+            plt.savefig('cena.png')
+
+            # Grafico Totale Calorie
+            plt.subplot(224)
+            plt.bar(df_totale_calorie['Giorno'], df_totale_calorie['Totale Calorie'])
+            plt.title('Totale Kcal per giorno')
+            plt.savefig('totale_calorie.png')
+
+            # Chiudi la figura
             plt.close()
 
-            # Includi il plot nel PDF
-            pdf.drawInlineImage('weekly_diet_plot.png', 100, 500, width=400, height=200)
-            pdf.showPage()  # Aggiungi una nuova pagina per ogni settimana
+            # Crea una lista con il percorso delle immagini
+            images = ['totale_calorie.png']
 
-        # Salva il PDF prima di inviarlo
-        pdf.save()
+            # Crea un documento PDF con ReportLab
+            pdf_output = BytesIO()
+            c = canvas.Canvas(pdf_output, pagesize=letter)
 
-        # Verifica che il buffer contenga dati prima di inviare il documento
-        if buffer.tell() > 0:
-            buffer.seek(0)
-            # Invia il PDF all'utente
-            bot_telegram.send_document(telegram_id, document=InputFile(buffer),
-                                       caption='Dieta Settimanale')
+            # Informazioni utente
+            user_info = (f"Informazioni Utente - Nome: {user_profile.get('nome_utente')}, "
+                         f"Età: {user_profile.get('eta')}, Malattie: {user_profile.get('malattie')},"
+                         f" Emozione: {user_profile.get('emozione')}")
+            dieta_settimanale_info = (f"Dieta Settimana {dieta_settimanale.get('dieta_settimanale_id')},"
+                                      f" {dieta_settimanale.get('data')}")
+            mysql_connection, mysql_cursor = connect_mysql()
+            feedback_dieta = write_chatgpt_for_dieta_info(openai, user_profile, mysql_cursor, telegram_id)
 
-        # Rimuovi il file temporaneo del plot
-        if os.path.exists('weekly_diet_plot.png'):
-            os.remove('weekly_diet_plot.png')
+            # Fattore di scala per ridimensionare le immagini
+            scale_factor = 0.5  # Puoi regolare questo valore a seconda delle dimensioni desiderate
 
-        buffer.seek(0)
-        return buffer
+            # Impostazioni della pagina
+            page_width, page_height = letter
+            start_x = 60  # Puoi regolare questa posizione x di partenza
+            max_width = page_width - start_x
+
+            # Aggiungi le immagini al PDF
+            for image_path in images:
+                c.drawString(240, 780, dieta_settimanale_info)
+                c.drawString(start_x, 750, user_info)
+
+                # Creazione di un oggetto Paragraph per gestire il wrapping del testo
+                style = getSampleStyleSheet()["BodyText"]
+                text_object = Paragraph(feedback_dieta, style=style)
+
+                # Disegna il testo "Feedback" sopra il paragrafo "feedback_dieta"
+                c.drawString(start_x, 710, "Feedback")
+
+                # Disegna il paragrafo "feedback_dieta" con wrapping
+                text_object.wrapOn(c, max_width, page_height)
+                text_object.drawOn(c, start_x, 660)  # Regola la coordinata y in base alle tue esigenze
+
+                # Aggiungi l'immagine al PDF, ridimensionata proporzionalmente
+                try:
+                    img = Image.open(image_path)
+                    original_width, original_height = img.size
+
+                    # Calcola le nuove dimensioni
+                    new_width = int(original_width * scale_factor)
+                    new_height = int(original_height * scale_factor)
+
+                    page_width, page_height = letter
+
+                    # Calcola le coordinate per centrare l'immagine
+                    x = (page_width - new_width) / 2
+                    y = (page_height - new_height) / 2
+
+                    c.drawInlineImage(img, x, y, width=new_width, height=new_height)
+                except Exception as e:
+                    print(f"Errore nell'aggiunta di {image_path} al PDF: {e}")
+
+            # Salva il PDF
+            c.save()
+
+            # Invia il documento PDF all'utente Telegram
+            pdf_output.seek(0)
+            pdf_file = pdf_output.getvalue()
+            bot_telegram.send_document(telegram_id, document=('dieta_settimanale.pdf', pdf_file))
+
+            # Cancella le immagini
+            image_files = ['colazione.png', 'pranzo.png', 'cena.png', 'totale_calorie.png']
+            for image_file in image_files:
+                if os.path.exists(image_file):
+                    os.remove(image_file)
 
     # metodo per gestire il comando /profilo per visualizzare i dati del profilo
     @bot_telegram.message_handler(commands=[PROFILO_COMMAND])
