@@ -25,10 +25,11 @@ from reportlab.platypus import Paragraph
 from src.chatGPT_response import write_chatgpt, write_chatgpt_for_dieta_info
 from src.connection import connect, connect_mysql
 from src.controls import control_tag, check_time_in_range
-from src.handle_reminder_data import save_user_food_response, send_reminder_message, send_week_reminder_message
+from src.handle_reminder_data import save_user_food_response, send_week_reminder_message
 from src.handle_user_data import get_user_profile, create_new_user, ask_next_question, get_all_telegram_ids, \
     voice_recognizer, _clear, photo_recognizer, get_dieta_settimanale_ids, \
     get_dieta_settimanale_profile
+import time as trem
 
 
 def generate_all_weekly_diets_pdf(message):
@@ -139,8 +140,10 @@ def voice_handler_copy(message):
     """
     print(message)
 
-
+# per poter usare i formati orari e di data italiani
 locale.setlocale(locale.LC_TIME, 'it_IT')
+
+# per poter leggere il file .env
 load_dotenv()
 
 # Constant
@@ -191,6 +194,10 @@ queue = Queue()
 
 # inizializzazione della lista che contiene le risposte ai messaggi dei reminder dell'utente
 user_response_message = []
+
+# Variabile di stato per coordinare l'esecuzione tra i thread
+event_send_reminder = threading.Event()
+event_handle_response = threading.Event()
 
 if __name__ == '__main__':
 
@@ -461,7 +468,6 @@ if __name__ == '__main__':
         msg = control_tag(root, "./telegram/informazioni", START_COMMAND, "spiegazioni")
         bot_telegram.send_message(telegram_id, msg.replace('{nome}', message.chat.first_name))
         # Inizia chiedendo la prima domanda
-        print("pre-start" + index.__str__())
 
         question, field = questions_and_fields[index]
         bot_telegram.send_message(telegram_id, question)
@@ -469,7 +475,6 @@ if __name__ == '__main__':
 
         index += 1
 
-        print("post-start" + index.__str__())
 
 
     @bot_telegram.message_handler(func=lambda message: True, content_types=['text', 'voice', 'photo'])
@@ -539,6 +544,7 @@ if __name__ == '__main__':
             elif index > len(questions_and_fields):
 
                 if event.is_set():
+                    event_send_reminder.set()
                     reminder_message_thread = threading.Thread(target=send_reminder_message, daemon=True, args=(
                         event, bot_telegram, ORA_COLAZIONE_START, ORA_COLAZIONE_END, ORA_PRANZO_START, ORA_PRANZO_END,
                         ORA_CENA_START, ORA_CENA_END,))
@@ -610,7 +616,7 @@ def handle_reminder_response(message):
     :return: la query per salvare il cibo scritto dall'utente nel messaggio
     :rtype: Message
     """
-    global meal_type, mysql_cursor, mysql_connection, queue, user_response_message
+    global meal_type, mysql_cursor, mysql_connection, queue, user_response_message,event_send_reminder, event_handle_response
 
     serialized_message = pickle.dumps(message)
     queue.put(serialized_message)
@@ -647,6 +653,7 @@ def handle_reminder_response(message):
                                         user_response, app_id, app_key)
                 event.clear()
                 event.wait(10)
+                event_send_reminder.set()
                 event.set()
 
     except Exception as main_exception:
@@ -716,6 +723,60 @@ def photo_handler(message):
         respost = write_chatgpt(openai, results, user_profile, mysql_cursor, telegram_id)
         bot_telegram.send_message(telegram_id, respost)
 
+
+def send_reminder_message(event, bot_telegram, ORA_COLAZIONE_START, ORA_COLAZIONE_END, ORA_PRANZO_START, ORA_PRANZO_END,
+                          ORA_CENA_START, ORA_CENA_END):
+    """
+        Questa funzione serve per inviare in determinati eventi temporali dei reminder per conoscere
+         la dieta settimanale dell'utente
+
+        :param event: serve per gestire gli eventi e alternare l'esecuzione dei metodi
+        :type event: Event
+        :param bot_telegram: corrisponde alla variabile che contiene l'api key del proprio bot_telegram
+                            e permette di accedere ai metodi della libreria Telebot
+        :type bot_telegram: Telebot
+        :param ORA_COLAZIONE_START: inizio dell'intervallo per l'ora di colazione
+        :type ORA_COLAZIONE_START: time.py
+        :param ORA_COLAZIONE_END: fine dell'intervallo per l'ora di colazione
+        :type ORA_COLAZIONE_END: time.py
+        :param ORA_PRANZO_START: inizio dell'intervallo per l'ora di pranzo
+        :type ORA_PRANZO_START: time.py
+        :param ORA_PRANZO_END: fine dell'intervallo per l'ora di pranzo
+        :type ORA_PRANZO_END: time.py
+        :param ORA_CENA_START: inizio dell'intervallo per l'ora di cena
+        :type ORA_CENA_START: time.py
+        :param ORA_CENA_END: fine dell'intervallo per l'ora di cena
+        :type ORA_CENA_END: time.py
+
+
+        :return: il reminder da inviare all'utente
+        :rtype: Message
+        """
+    telegram_ids = get_all_telegram_ids()
+
+    current_time_reminder = datetime.now().time()
+    # Serializzazione dell'oggetto Message
+
+    while event.is_set():
+        for telegram_id in telegram_ids:
+            if check_time_in_range(current_time_reminder, ORA_COLAZIONE_START, ORA_COLAZIONE_END):
+                bot_telegram.send_message(telegram_id,
+                                          "Buongiorno! Cosa hai mangiato a colazione? Indica prima del cibo la "
+                                          "quantità.",
+                                          trem.sleep(10))
+
+            elif check_time_in_range(current_time_reminder, ORA_PRANZO_START, ORA_PRANZO_END):
+                bot_telegram.send_message(telegram_id,
+                                          "Pranzo time! Cosa hai mangiato a pranzo? Indica prima del cibo la quantità.",
+                                          trem.sleep(10))
+
+            elif check_time_in_range(current_time_reminder, ORA_CENA_START, ORA_CENA_END):
+                bot_telegram.send_message(telegram_id,
+                                          "Cena! Cosa hai mangiato a cena? Indica prima del cibo la quantità.",
+                                          trem.sleep(10))
+
+            event_send_reminder.clear()  # Disattiva l'evento per inviare il reminder
+            event_send_reminder.wait()  # Attendere che l'evento per inviare il reminder venga attivato
 
 # Esegui il polling infinito del bot Telegram
 bot_telegram.infinity_polling()

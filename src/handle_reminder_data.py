@@ -20,58 +20,6 @@ from src.handle_user_data import get_all_telegram_ids
 locale.setlocale(locale.LC_TIME, 'it_IT')
 
 
-def send_reminder_message(event, bot_telegram, ORA_COLAZIONE_START, ORA_COLAZIONE_END, ORA_PRANZO_START, ORA_PRANZO_END,
-                          ORA_CENA_START, ORA_CENA_END):
-    """
-        Questa funzione serve per inviare in determinati eventi temporali dei reminder per conoscere
-         la dieta settimanale dell'utente
-
-        :param event: serve per gestire gli eventi e alternare l'esecuzione dei metodi
-        :type event: Event
-        :param bot_telegram: corrisponde alla variabile che contiene l'api key del proprio bot_telegram
-                            e permette di accedere ai metodi della libreria Telebot
-        :type bot_telegram: Telebot
-        :param ORA_COLAZIONE_START: inizio dell'intervallo per l'ora di colazione
-        :type ORA_COLAZIONE_START: time.py
-        :param ORA_COLAZIONE_END: fine dell'intervallo per l'ora di colazione
-        :type ORA_COLAZIONE_END: time.py
-        :param ORA_PRANZO_START: inizio dell'intervallo per l'ora di pranzo
-        :type ORA_PRANZO_START: time.py
-        :param ORA_PRANZO_END: fine dell'intervallo per l'ora di pranzo
-        :type ORA_PRANZO_END: time.py
-        :param ORA_CENA_START: inizio dell'intervallo per l'ora di cena
-        :type ORA_CENA_START: time.py
-        :param ORA_CENA_END: fine dell'intervallo per l'ora di cena
-        :type ORA_CENA_END: time.py
-
-
-        :return: il reminder da inviare all'utente
-        :rtype: Message
-        """
-    telegram_ids = get_all_telegram_ids()
-
-    current_time_reminder = datetime.now().time()
-    # Serializzazione dell'oggetto Message
-
-    while event.is_set():
-        for telegram_id in telegram_ids:
-            if check_time_in_range(current_time_reminder, ORA_COLAZIONE_START, ORA_COLAZIONE_END):
-                bot_telegram.send_message(telegram_id,
-                                          "Buongiorno! Cosa hai mangiato a colazione? Indica prima del cibo la "
-                                          "quantità.",
-                                          trem.sleep(10))
-
-            elif check_time_in_range(current_time_reminder, ORA_PRANZO_START, ORA_PRANZO_END):
-                bot_telegram.send_message(telegram_id,
-                                          "Pranzo time! Cosa hai mangiato a pranzo? Indica prima del cibo la quantità.",
-                                          trem.sleep(10))
-
-            elif check_time_in_range(current_time_reminder, ORA_CENA_START, ORA_CENA_END):
-                bot_telegram.send_message(telegram_id,
-                                          "Cena! Cosa hai mangiato a cena? Indica prima del cibo la quantità.",
-                                          trem.sleep(10))
-
-
 # chat_id checks id corresponds to your list or not.
 def send_week_reminder_message(event, bot_telegram):
     """

@@ -339,7 +339,8 @@ def _clear():
 
 def photo_recognizer(message, bot_telegram):
     """
-    Questa funzione permette di salvare le risposte dell'utente nel database aggiornando cosi i dati dell'utente
+    Questa funzione permette di riconoscere le foto inviate dall'utente e ritornare il testo
+    che rappresenta il risultato del riconoscimento della foto
 
     :param message: messaggio dell'utente, che in questo caso è una foto
     :type message: Message
