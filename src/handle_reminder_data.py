@@ -13,7 +13,6 @@ from datetime import datetime, timedelta
 import requests
 from deep_translator import GoogleTranslator
 
-from src.controls import check_time_in_range
 from src.handle_user_data import get_all_telegram_ids
 
 # Imposta la lingua italiana per il modulo locale
@@ -42,7 +41,7 @@ def send_week_reminder_message(event, bot_telegram):
     while not event.is_set():
         for telegram_id in telegram_ids:
             bot_telegram.send_message(telegram_id,
-                                      "E' passata una settimana! Tieni d'occhio la tua dieta. Tocca su /dashboard",
+                                      "E' passata una settimana! Tieni d'occhio la tua dieta. Tocca su /report",
                                       trem.sleep(60 * 60 * 24 * 7))
 
 
@@ -353,87 +352,3 @@ def traduci_testo(testo):
     except Exception as e:
         print(f"Errore durante la traduzione: {e}")
         return None
-
-
-def get_food_for_day(telegram_id, dieta_data, nome_giorno, cursor):
-    """
-        Questa funzione serve per recuperare i nomi dei cibi in base alla data
-
-        :param telegram_id: telegram_id dell'utente
-        :type telegram_id: int
-        :param dieta_data: è la data corrispondente alla dieta settimanale
-        :type dieta_data: date
-        :param nome_giorno: serve per recuperare il nome del giorno all'iinterno della dieta settimanale
-        :type nome_giorno: str
-        :param cursor: serve per eseguire le query
-        :type cursor: Cursor
-
-
-        :return: la lista dei cibi
-        :rtype: list
-        """
-    # Ottieni l'ID della dieta settimanale per la data specificata
-    cursor.execute("SELECT dieta_settimanale_id FROM dieta_settimanale WHERE telegram_id = ? AND data = ?",
-                   (telegram_id, dieta_data))
-    result = cursor.fetchone()
-
-    if result is None:
-        # Nessuna dieta trovata per la data specificata
-        return []
-
-    dieta_settimanale_id = result[0]
-
-    # Ottieni l'ID del giorno della settimana
-    cursor.execute("SELECT giorno_settimana_id FROM giorno_settimana WHERE nome = ? AND dieta_settimanale_id = ?",
-                   (nome_giorno, dieta_settimanale_id))
-    result = cursor.fetchone()
-
-    if result is None:
-        # Nessun giorno della settimana trovato con il nome specificato
-        return []
-
-    giorno_settimana_id = result[0]
-
-    # Ottieni i cibi per il giorno specificato
-    cursor.execute("""
-        SELECT cibo.nome, cibo.calorie
-        FROM cibo
-        INNER JOIN periodo_giorno ON cibo.periodo_giorno_id = periodo_giorno.periodo_giorno_id
-        WHERE periodo_giorno.giorno_settimana_id = ?
-    """, (giorno_settimana_id,))
-
-    cibi_giorno = []
-    for row in cursor.fetchall():
-        cibo = {'nome': row[0], 'calorie': row[1]}
-        cibi_giorno.append(cibo)
-
-    return cibi_giorno
-
-
-def get_dieta_dates_by_telegram_id(telegram_id, mysql_cursor):
-    """
-        Questa funzione serve per recuperare le date delle diete dell'utente in base al telegram id
-
-        :param telegram_id: è l'id telegram dell'utente
-        :type telegram_id: int
-        :param mysql_cursor: serve per eseguire le query
-        :type mysql_cursor: Cursor
-
-        :return: la lista delle date delle diete dell'utente
-        :rtype: list
-        """
-    try:
-        # Esegui la query per ottenere le date della dieta per un determinato utente
-        mysql_cursor.execute("SELECT DISTINCT data FROM dieta_settimanale WHERE telegram_id = %s", (telegram_id,))
-
-        # Recupera i risultati della query
-        result = mysql_cursor.fetchall()
-
-        # Restituisci le date delle diete
-        dieta_dates = [row[0] for row in result]
-        return dieta_dates
-
-    except Exception as e:
-        # Gestisci eventuali eccezioni
-        print(f"Errore durante l'ottenimento delle date della dieta: {e}")
-        return []

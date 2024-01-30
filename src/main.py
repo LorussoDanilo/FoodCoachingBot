@@ -34,7 +34,7 @@ import time as trem
 
 def generate_all_weekly_diets_pdf(message):
     """
-    Questa funzione serve per gestire il comando dashboard e genera un pdf con il plot delle diete settimanali dell'utente
+    Questa funzione serve per gestire il comando report e genera un pdf con il plot delle diete settimanali dell'utente
 
     :type message: Message
 
@@ -140,6 +140,7 @@ def voice_handler_copy(message):
     """
     print(message)
 
+
 # per poter usare i formati orari e di data italiani
 locale.setlocale(locale.LC_TIME, 'it_IT')
 
@@ -150,7 +151,7 @@ load_dotenv()
 START_COMMAND = 'start'
 EDIT_COMMAND = 'modifica'
 PROFILO_COMMAND = 'profilo'
-DASHBOARD_COMMAND = 'dashboard'
+REPORT_COMMAND = 'report'
 
 # Domande da porre all'utente durante la profilazione o modifica dei dati del profilo
 questions_and_fields = [
@@ -173,6 +174,8 @@ openai, bot_telegram, root = connect()
 app_id = os.getenv('EDAMAM_APP_ID')
 app_key = os.getenv('EDAMAM_APP_KEY')
 
+api_key = os.getenv('GOOGLE_CLOUD_API_KEY')
+
 # Variabile per gestire le funzionalità del chatbot. Serve per capire quando una funzionalità deve cominciare
 event = threading.Event()
 
@@ -184,7 +187,7 @@ ORA_COLAZIONE_START = time(8, 0)
 ORA_COLAZIONE_END = time(9, 0)
 ORA_PRANZO_START = time(11, 0)
 ORA_PRANZO_END = time(12, 0)
-ORA_CENA_START = time(12, 30)
+ORA_CENA_START = time(16, 30)
 ORA_CENA_END = time(23, 50)
 
 ORA_REMINDER_SETTIMANALE = time(11, 13, 10)
@@ -201,10 +204,10 @@ event_handle_response = threading.Event()
 
 if __name__ == '__main__':
 
-    @bot_telegram.message_handler(commands=[DASHBOARD_COMMAND])
+    @bot_telegram.message_handler(commands=[REPORT_COMMAND])
     def generate_all_weekly_diets_pdf(message):
         """
-            Questa funzione serve per gestire il comando dashboard e genera un pdf con il plot delle diete settimanali
+            Questa funzione serve per gestire il comando report e genera un pdf con il plot delle diete settimanali
             dell'utente
 
             :type message: Message
@@ -378,6 +381,7 @@ if __name__ == '__main__':
                 if os.path.exists(image_file):
                     os.remove(image_file)
 
+
     # metodo per gestire il comando /profilo per visualizzare i dati del profilo
     @bot_telegram.message_handler(commands=[PROFILO_COMMAND])
     def show_user_profile(message):
@@ -407,9 +411,10 @@ if __name__ == '__main__':
             # Messaggio se l'utente non ha un profilo
             bot_telegram.send_message(telegram_id, "Non hai ancora completato il tuo profilo.")
 
+
     # Metodo per gestire il comando /modifica
     @bot_telegram.message_handler(commands=[EDIT_COMMAND])
-    def edit_command(message):
+    def edit_profile(message):
         """
         Questa funzione serve per gestire il comando profilo e permette di modificare i dati del profilo ponendo
         nuovamente all'utente le domande di profilazione
@@ -436,6 +441,7 @@ if __name__ == '__main__':
             event, bot_telegram, ORA_COLAZIONE_START, ORA_COLAZIONE_END, ORA_PRANZO_START, ORA_PRANZO_END,
             ORA_CENA_START, ORA_CENA_END,))
         reminder_message_thread.start()
+
 
     # Metodo per gestire il comando /start
     @bot_telegram.message_handler(commands=[START_COMMAND])
@@ -476,7 +482,6 @@ if __name__ == '__main__':
         index += 1
 
 
-
     @bot_telegram.message_handler(func=lambda message: True, content_types=['text', 'voice', 'photo'])
     def handle_profile_response(message):
         """
@@ -492,7 +497,7 @@ if __name__ == '__main__':
         :return: domande per la profilazione dell'utente, reminder e passa le risposte a chatgpt
         :rtype: Message
         """
-        global mysql_connection, mysql_cursor, event, index
+        global mysql_connection, mysql_cursor, event, index, event_send_reminder
         user_response = str(message.text)
         telegram_id = message.chat.id
         telegram_ids = get_all_telegram_ids()
@@ -541,6 +546,7 @@ if __name__ == '__main__':
                     else:
                         event.clear()
 
+
             elif index > len(questions_and_fields):
 
                 if event.is_set():
@@ -552,6 +558,7 @@ if __name__ == '__main__':
 
                     reminder_thread = threading.Thread(target=handle_reminder_response, daemon=True, args=(message,))
                     reminder_thread.start()
+
 
                 else:
                     reminder_week_message_thread = threading.Thread(target=send_week_reminder_message, daemon=True,
@@ -686,11 +693,12 @@ def voice_handler(message):
 
         # chiamare la funzione che permette di riconoscere la voce e convertire il file .ogg in .wav
         text = voice_recognizer()
+        print(text)
 
         user_profile = get_user_profile(telegram_id)
         print(user_profile)
         respost = write_chatgpt(openai, text, user_profile, mysql_cursor, telegram_id)
-        bot_telegram.send_message(message.chat.id, respost)
+        bot_telegram.send_message(telegram_id, respost)
         # chiamare il metodo per cancellare i file .ogg e .wav generati
         _clear()
 
@@ -757,7 +765,7 @@ def send_reminder_message(event, bot_telegram, ORA_COLAZIONE_START, ORA_COLAZION
     current_time_reminder = datetime.now().time()
     # Serializzazione dell'oggetto Message
 
-    while event.is_set():
+    while event.is_set() and event_send_reminder.is_set():
         for telegram_id in telegram_ids:
             if check_time_in_range(current_time_reminder, ORA_COLAZIONE_START, ORA_COLAZIONE_END):
                 bot_telegram.send_message(telegram_id,
@@ -776,7 +784,7 @@ def send_reminder_message(event, bot_telegram, ORA_COLAZIONE_START, ORA_COLAZION
                                           trem.sleep(10))
 
             event_send_reminder.clear()  # Disattiva l'evento per inviare il reminder
-            event_send_reminder.wait()  # Attendere che l'evento per inviare il reminder venga attivato
+    event_send_reminder.wait()  # Attendere che l'evento per inviare il reminder venga attivato
 
 # Esegui il polling infinito del bot Telegram
 bot_telegram.infinity_polling()

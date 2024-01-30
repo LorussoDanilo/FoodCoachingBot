@@ -307,16 +307,16 @@ def voice_recognizer():
 
     except sr.UnknownValueError:
         logger.warning("Google Cloud Speech Recognition could not understand the audio.")
-        text = 'Parole non riconosciute.'
+        text = 'Parole non riconosciute Unkonown.'
 
     except sr.RequestError as e:
         logger.error(f"Google Cloud Speech Recognition request failed; {e}")
-        text = 'Parole non riconosciute.'
+        text = 'Parole non riconosciute. Request failed'
 
     except Exception as e:
         logger.error(f"Exception:\n{traceback.format_exc()}")
         print(f"Exception: {e}")
-        text = 'Parole non riconosciute.'
+        text = 'Parole non riconosciute. General_exception'
 
     return text
 
