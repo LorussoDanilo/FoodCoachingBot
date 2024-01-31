@@ -631,9 +631,7 @@ def handle_reminder_response(message):
     deserialized_message = pickle.loads(serialized_message)
     user_response_message.append(str(deserialized_message.text))
     user_response = str(deserialized_message.text)
-    file_id = message.voice.file_id
-    file = bot_telegram.get_file(file_id)
-    download_file = bot_telegram.download_file(file.file_path)
+
 
     current_time_reminder = datetime.now().time()
     try:
@@ -646,6 +644,9 @@ def handle_reminder_response(message):
                                             user_response, app_id, app_key)
 
                 elif message.content_type == 'voice':
+                    file_id = message.voice.file_id
+                    file = bot_telegram.get_file(file_id)
+                    download_file = bot_telegram.download_file(file.file_path)
                     with open('audio.ogg', 'wb') as file:
                         file.write(download_file)
 
@@ -669,6 +670,9 @@ def handle_reminder_response(message):
                                             user_response, app_id, app_key)
 
                 elif message.content_type == 'voice':
+                    file_id = message.voice.file_id
+                    file = bot_telegram.get_file(file_id)
+                    download_file = bot_telegram.download_file(file.file_path)
                     with open('audio.ogg', 'wb') as file:
                         file.write(download_file)
 
@@ -693,6 +697,9 @@ def handle_reminder_response(message):
                                             user_response, app_id, app_key)
 
                 elif message.content_type == 'voice':
+                    file_id = message.voice.file_id
+                    file = bot_telegram.get_file(file_id)
+                    download_file = bot_telegram.download_file(file.file_path)
 
                     with open('audio.ogg', 'wb') as file:
                         file.write(download_file)
