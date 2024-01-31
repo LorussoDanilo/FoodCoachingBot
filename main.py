@@ -202,6 +202,7 @@ user_response_message = []
 event_send_reminder = threading.Event()
 event_handle_response = threading.Event()
 
+
 if __name__ == '__main__':
 
     @bot_telegram.message_handler(commands=[REPORT_COMMAND])
