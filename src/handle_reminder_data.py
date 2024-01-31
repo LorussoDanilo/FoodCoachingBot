@@ -42,7 +42,7 @@ def send_week_reminder_message(event, bot_telegram):
         for telegram_id in telegram_ids:
             bot_telegram.send_message(telegram_id,
                                       "E' passata una settimana! Tieni d'occhio la tua dieta. Tocca su /report",
-                                      trem.sleep(60 * 60 * 24 * 7))
+                                      trem.sleep(20))
 
 
 def get_or_insert_dieta_settimanale(cursor, telegram_id, date):

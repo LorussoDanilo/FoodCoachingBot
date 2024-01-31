@@ -546,7 +546,6 @@ if __name__ == '__main__':
                     else:
                         event.clear()
 
-
             elif index > len(questions_and_fields):
 
                 if event.is_set():
@@ -558,7 +557,6 @@ if __name__ == '__main__':
 
                     reminder_thread = threading.Thread(target=handle_reminder_response, daemon=True, args=(message,))
                     reminder_thread.start()
-
 
                 else:
                     reminder_week_message_thread = threading.Thread(target=send_week_reminder_message, daemon=True,
@@ -611,7 +609,7 @@ if __name__ == '__main__':
                 bot_telegram.send_message(telegram_id, f"Errore del database: {db_error}")
 
 
-@bot_telegram.message_handler(func=lambda message: True)
+@bot_telegram.message_handler(func=lambda message: True, content_types=['text', 'voice', 'photo'])
 def handle_reminder_response(message):
     """
     Questa funzione serve per gestire le risposte subito dopo il reminder cosi da salvare il cibo nel database.
@@ -623,7 +621,8 @@ def handle_reminder_response(message):
     :return: la query per salvare il cibo scritto dall'utente nel messaggio
     :rtype: Message
     """
-    global meal_type, mysql_cursor, mysql_connection, queue, user_response_message,event_send_reminder, event_handle_response
+    global meal_type, mysql_cursor, mysql_connection, queue, user_response_message, event_send_reminder, \
+        event_handle_response
 
     serialized_message = pickle.dumps(message)
     queue.put(serialized_message)
@@ -632,6 +631,9 @@ def handle_reminder_response(message):
     deserialized_message = pickle.loads(serialized_message)
     user_response_message.append(str(deserialized_message.text))
     user_response = str(deserialized_message.text)
+    file_id = message.voice.file_id
+    file = bot_telegram.get_file(file_id)
+    download_file = bot_telegram.download_file(file.file_path)
 
     current_time_reminder = datetime.now().time()
     try:
@@ -639,27 +641,74 @@ def handle_reminder_response(message):
         if check_time_in_range(current_time_reminder, ORA_COLAZIONE_START, ORA_COLAZIONE_END):
             for telegram_id in telegram_ids:
                 meal_type = "colazione"
-                save_user_food_response(bot_telegram, mysql_cursor, mysql_connection, telegram_id, meal_type,
-                                        user_response, app_id, app_key)
+                if message.content_type == 'text':
+                    save_user_food_response(bot_telegram, mysql_cursor, mysql_connection, telegram_id, meal_type,
+                                            user_response, app_id, app_key)
+
+                elif message.content_type == 'voice':
+                    with open('audio.ogg', 'wb') as file:
+                        file.write(download_file)
+
+                    text = voice_recognizer()
+                    save_user_food_response(bot_telegram, mysql_cursor, mysql_connection, telegram_id, meal_type,
+                                            text, app_id, app_key)
+                    _clear()
+                elif message.content_type == 'photo':
+                    text = photo_recognizer(message, bot_telegram)
+                    save_user_food_response(bot_telegram, mysql_cursor, mysql_connection, telegram_id, meal_type,
+                                            text, app_id, app_key)
                 event.clear()
-                event.wait(10)
+                event.wait(40)
+                event_send_reminder.set()
                 event.set()
         elif check_time_in_range(current_time_reminder, ORA_PRANZO_START, ORA_PRANZO_END):
             for telegram_id in telegram_ids:
                 meal_type = "pranzo"
-                save_user_food_response(bot_telegram, mysql_cursor, mysql_connection, telegram_id, meal_type,
-                                        user_response, app_id, app_key)
+                if message.content_type == 'text':
+                    save_user_food_response(bot_telegram, mysql_cursor, mysql_connection, telegram_id, meal_type,
+                                            user_response, app_id, app_key)
+
+                elif message.content_type == 'voice':
+                    with open('audio.ogg', 'wb') as file:
+                        file.write(download_file)
+
+                    text = voice_recognizer()
+                    save_user_food_response(bot_telegram, mysql_cursor, mysql_connection, telegram_id, meal_type,
+                                            text, app_id, app_key)
+                    _clear()
+                elif message.content_type == 'photo':
+                    text = photo_recognizer(message, bot_telegram)
+                    save_user_food_response(bot_telegram, mysql_cursor, mysql_connection, telegram_id, meal_type,
+                                            text, app_id, app_key)
                 event.clear()
-                event.wait(10)
+                event.wait(40)
+                event_send_reminder.set()
                 event.set()
 
         elif check_time_in_range(current_time_reminder, ORA_CENA_START, ORA_CENA_END):
             for telegram_id in telegram_ids:
                 meal_type = "cena"
-                save_user_food_response(bot_telegram, mysql_cursor, mysql_connection, telegram_id, meal_type,
-                                        user_response, app_id, app_key)
+                if message.content_type == 'text':
+                    save_user_food_response(bot_telegram, mysql_cursor, mysql_connection, telegram_id, meal_type,
+                                            user_response, app_id, app_key)
+
+                elif message.content_type == 'voice':
+
+                    with open('audio.ogg', 'wb') as file:
+                        file.write(download_file)
+
+                    text = voice_recognizer()
+                    print(text)
+                    save_user_food_response(bot_telegram, mysql_cursor, mysql_connection, telegram_id, meal_type,
+                                            text, app_id, app_key)
+                    _clear()
+                elif message.content_type == 'photo':
+                    text = photo_recognizer(message, bot_telegram)
+                    save_user_food_response(bot_telegram, mysql_cursor, mysql_connection, telegram_id, meal_type,
+                                            text, app_id, app_key)
+
                 event.clear()
-                event.wait(10)
+                event.wait(40)
                 event_send_reminder.set()
                 event.set()
 
@@ -681,6 +730,7 @@ def voice_handler(message):
     """
     file_id = message.voice.file_id
     file = bot_telegram.get_file(file_id)
+
     telegram_id = message.chat.id
 
     file_size = file.file_size
@@ -771,20 +821,25 @@ def send_reminder_message(event, bot_telegram, ORA_COLAZIONE_START, ORA_COLAZION
                 bot_telegram.send_message(telegram_id,
                                           "Buongiorno! Cosa hai mangiato a colazione? Indica prima del cibo la "
                                           "quantità.",
-                                          trem.sleep(10))
+                                          trem.sleep(40))
+                event_send_reminder.clear()  # Disattiva l'evento per inviare il reminder
+
 
             elif check_time_in_range(current_time_reminder, ORA_PRANZO_START, ORA_PRANZO_END):
                 bot_telegram.send_message(telegram_id,
                                           "Pranzo time! Cosa hai mangiato a pranzo? Indica prima del cibo la quantità.",
-                                          trem.sleep(10))
+                                          trem.sleep(40))
+                event_send_reminder.clear()  # Disattiva l'evento per inviare il reminder
+
 
             elif check_time_in_range(current_time_reminder, ORA_CENA_START, ORA_CENA_END):
                 bot_telegram.send_message(telegram_id,
                                           "Cena! Cosa hai mangiato a cena? Indica prima del cibo la quantità.",
-                                          trem.sleep(10))
+                                          trem.sleep(40))
 
             event_send_reminder.clear()  # Disattiva l'evento per inviare il reminder
     event_send_reminder.wait()  # Attendere che l'evento per inviare il reminder venga attivato
+
 
 # Esegui il polling infinito del bot Telegram
 bot_telegram.infinity_polling()
