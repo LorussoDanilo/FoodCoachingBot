@@ -8,6 +8,7 @@ Questo modulo contiene le funzioni che servono per gestire l'invio dei reminder 
 import calendar
 import locale
 import time as trem
+import traceback
 from datetime import datetime, timedelta
 
 import requests
@@ -36,9 +37,7 @@ def send_week_reminder_message(event, bot_telegram):
     """
     telegram_ids = get_all_telegram_ids()
 
-    datetime.now().time()
-    # Serializzazione dell'oggetto Message
-    while not event.is_set():
+    if not event.is_set():
         for telegram_id in telegram_ids:
             bot_telegram.send_message(telegram_id,
                                       "E' passata una settimana! Tieni d'occhio la tua dieta. Tocca su /report",

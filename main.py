@@ -21,6 +21,8 @@ from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.pdfgen import canvas
 from reportlab.platypus import Paragraph
+from telebot.types import InputFile, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram.constants import ParseMode
 
 from src.chatGPT_response import write_chatgpt, write_chatgpt_for_dieta_info
 from src.connection import connect, connect_mysql
@@ -201,7 +203,6 @@ user_response_message = []
 # Variabile di stato per coordinare l'esecuzione tra i thread
 event_send_reminder = threading.Event()
 event_handle_response = threading.Event()
-
 
 if __name__ == '__main__':
 
@@ -471,17 +472,44 @@ if __name__ == '__main__':
             # Se l'utente non esiste viene creato inserendo l'id telegram e il suo username
             create_new_user(telegram_id, username)
 
-        # Tutte le informazioni necessarie sono state fornite
-        msg = control_tag(root, "./telegram/informazioni", START_COMMAND, "spiegazioni")
-        bot_telegram.send_message(telegram_id, msg.replace('{nome}', message.chat.first_name))
-        # Inizia chiedendo la prima domanda
+        # Inizia chiedendo il consenso ai dati
+        reply_markup = InlineKeyboardMarkup([
+            [InlineKeyboardButton("Si", callback_data='consenso_si'),
+             InlineKeyboardButton("No", callback_data='consenso_no')]
+        ])
+        consenso_message = ("Prima di cominciare con le domande di profilazione, dobbiamo ottenere il tuo consenso per "
+                            "l'uso dei dati. Acconsenti?")
+        bot_telegram.send_message(telegram_id, consenso_message, reply_markup=reply_markup)
 
-        question, field = questions_and_fields[index]
-        bot_telegram.send_message(telegram_id, question)
-        # Incremento dell'indice per proseguire nelle domande
 
-        index += 1
+    # Funzione per gestire la risposta ai pulsanti di consenso
+    @bot_telegram.callback_query_handler(func=lambda call: True)
+    def handle_consenso_buttons(call):
+        global index
+        user_id = call.from_user.id
+        consenso_answer = call.data
+        telegram_id = call.from_user.id
 
+        if consenso_answer == 'consenso_si':
+            # Utente ha acconsentito, puoi iniziare con le domande di profilazione
+            bot_telegram.send_message(user_id, "Ottimo! Cominciamo con le domande di profilazione.")
+            # Inizia chiedendo la prima domanda
+
+            question, field = questions_and_fields[index]
+            bot_telegram.send_message(telegram_id, question)
+            # Incremento dell'indice per proseguire nelle domande
+
+            index += 1
+            # Aggiungi il codice per iniziare le domande di profilazione
+        elif consenso_answer == 'consenso_no':
+            # Utente ha rifiutato, puoi gestire di conseguenza
+            bot_telegram.send_message(user_id, "Puoi utilizzare il bot ma non acconsentendo alla profilazione, "
+                                               "risulterà meno efficiente😢")
+            index = 4
+            event.clear()
+
+
+    # Gestisci altri possibili callback_data
 
     @bot_telegram.message_handler(func=lambda message: True, content_types=['text', 'voice', 'photo'])
     def handle_profile_response(message):
@@ -505,7 +533,7 @@ if __name__ == '__main__':
         current_time_reminder = datetime.now().time()
 
         try:
-            if index < len(questions_and_fields):
+            if index <= len(questions_and_fields):
                 # Esecuzione della query per aggiornare il profilo dell'utente nel database
                 update_query = f"UPDATE utenti SET {questions_and_fields[index - 1][1]} = %s WHERE telegram_id = %s"
                 mysql_cursor.execute(update_query, (user_response, telegram_id))
@@ -519,36 +547,7 @@ if __name__ == '__main__':
                 index += 1
                 print("handle_profile_response" + index.__str__())
 
-            elif index == len(questions_and_fields):
-                update_query = f"UPDATE utenti SET {questions_and_fields[index - 1][1]} = %s WHERE telegram_id = %s"
-                mysql_cursor.execute(update_query, (user_response, telegram_id))
-                # Commit delle modifiche al database
-                mysql_connection.commit()
-                confirmation_message = f"{questions_and_fields[index - 1][1]} salvat*: {user_response}"
-                bot_telegram.send_message(telegram_id, confirmation_message)
-                bot_telegram.send_message(telegram_id,
-                                          "Il tuo profilo è completo. Grazie! Chiedimi ciò che desideri😊")
-                index += 1
-
-                for telegram_id in telegram_ids:
-                    if check_time_in_range(current_time_reminder, ORA_COLAZIONE_START, ORA_COLAZIONE_END):
-                        bot_telegram.send_message(telegram_id,
-                                                  "Buongiorno! Cosa hai mangiato a colazione? Indica prima del cibo "
-                                                  "la quantità.")
-
-                    elif check_time_in_range(current_time_reminder, ORA_PRANZO_START, ORA_PRANZO_END):
-                        bot_telegram.send_message(telegram_id,
-                                                  "Pranzo time! Cosa hai mangiato a pranzo? Indica prima del cibo la "
-                                                  "quantità.")
-
-                    elif check_time_in_range(current_time_reminder, ORA_CENA_START, ORA_CENA_END):
-                        bot_telegram.send_message(telegram_id,
-                                                  "Cena! Cosa hai mangiato a cena? Indica prima del cibo la quantità.")
-                    else:
-                        event.clear()
-
             elif index > len(questions_and_fields):
-
                 if event.is_set():
                     event_send_reminder.set()
                     reminder_message_thread = threading.Thread(target=send_reminder_message, daemon=True, args=(
@@ -589,11 +588,16 @@ if __name__ == '__main__':
                             voice_handler(message)
                         elif message.content_type == 'photo':
                             photo_handler(message)
+        except IndexError as ie:
+            print(f"Index error: {ie}")
+            bot_telegram.send_message(telegram_id,
+                                      "Il tuo profilo è completo. Grazie! Chiedimi ciò che desideri😊")
+            index +=1
+            event.clear()
 
         except Exception as e:
-            print(f"Valore errato: {e}")
-            telegram_id = message.chat.id
-            bot_telegram.send_message(telegram_id, "Hai inserito un valore errato. Riprova.")
+            print(f"Vincolo di integrità violato: {e}")
+
 
         except IntegrityError as integrity_error:
             print(f"Vincolo di integrità violato: {integrity_error}")
@@ -633,7 +637,6 @@ def handle_reminder_response(message):
     user_response_message.append(str(deserialized_message.text))
     user_response = str(deserialized_message.text)
 
-
     current_time_reminder = datetime.now().time()
     try:
 
@@ -659,6 +662,7 @@ def handle_reminder_response(message):
                     text = photo_recognizer(message, bot_telegram)
                     save_user_food_response(bot_telegram, mysql_cursor, mysql_connection, telegram_id, meal_type,
                                             text, app_id, app_key)
+
                 event.clear()
                 event.wait(40)
                 event_send_reminder.set()
@@ -719,6 +723,8 @@ def handle_reminder_response(message):
                 event.wait(40)
                 event_send_reminder.set()
                 event.set()
+        else:
+            event.clear()
 
     except Exception as main_exception:
         # Handle the main exception (e.g., log the error)
@@ -832,18 +838,18 @@ def send_reminder_message(event, bot_telegram, ORA_COLAZIONE_START, ORA_COLAZION
                                           trem.sleep(40))
                 event_send_reminder.clear()  # Disattiva l'evento per inviare il reminder
 
-
             elif check_time_in_range(current_time_reminder, ORA_PRANZO_START, ORA_PRANZO_END):
                 bot_telegram.send_message(telegram_id,
                                           "Pranzo time! Cosa hai mangiato a pranzo? Indica prima del cibo la quantità.",
                                           trem.sleep(40))
                 event_send_reminder.clear()  # Disattiva l'evento per inviare il reminder
 
-
             elif check_time_in_range(current_time_reminder, ORA_CENA_START, ORA_CENA_END):
                 bot_telegram.send_message(telegram_id,
                                           "Cena! Cosa hai mangiato a cena? Indica prima del cibo la quantità.",
                                           trem.sleep(40))
+            else:
+                event.clear()
 
             event_send_reminder.clear()  # Disattiva l'evento per inviare il reminder
     event_send_reminder.wait()  # Attendere che l'evento per inviare il reminder venga attivato

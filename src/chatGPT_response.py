@@ -32,6 +32,7 @@ def write_chatgpt(openai, message, profilo_utente, mysql_cursor, telegram_id):
     :rtype: str
     """
 
+    input_con_profilo_e_dieta = ""
     dieta_settimanale_text = ""
     try:
         # Estrai il testo dal messaggio
@@ -53,16 +54,25 @@ def write_chatgpt(openai, message, profilo_utente, mysql_cursor, telegram_id):
             dieta_settimanale_text = f"La mia dieta settimanale è la seguente:\n" + dieta_settimanale_info.__str__()
 
         # Aggiungi le informazioni del profilo e della dieta settimanale al messaggio di input per ChatGPT
-        input_con_profilo_e_dieta = (
-            f"La mia età è: {eta} | La mia malattia o disturbo è: {', '.join(malattie)} | Io quando mangio o penso al "
-            f"cibo provo un sentimento: {emozione}"f" | {dieta_settimanale_text}"
-            f" | Mettiti nei panni di un nutrizionista,tieni conto della mia età, delle mie malattie o disturbi, "
-            f"l'emozione che provo quando mangio o penso al cibo e alla mia dieta settimanale considerando anche"
-            f" i valori nutrizionali dei cibi"
-            f" e adatta il tuo linguaggio "
-            f"prima di rispondere alla seguente domanda:"
-            f" |\n{message_text}"
-        )
+        if eta and malattie and emozione:
+            input_con_profilo_e_dieta = (
+                f"La mia età è: {eta} | La mia malattia o disturbo è: {', '.join(malattie)} | Io quando mangio o penso al "
+                f"cibo provo un sentimento: {emozione}"f" | {dieta_settimanale_text}"
+                f" | Mettiti nei panni di un nutrizionista,tieni conto della mia età, delle mie malattie o disturbi, "
+                f"l'emozione che provo quando mangio o penso al cibo e alla mia dieta settimanale considerando anche"
+                f" i valori nutrizionali dei cibi"
+                f" e adatta il tuo linguaggio "
+                f"prima di rispondere alla seguente domanda:"
+                f" |\n{message_text}"
+            )
+        if not eta and not malattie and not emozione:
+            input_con_profilo_e_dieta = (
+                f"Considera che gli alimenti della mia dieta sono stati:{dieta_settimanale_text}"
+                f" | Mettiti nei panni di un nutrizionista e tieni conto della mia dieta settimanale considerando anche"
+                f" i valori nutrizionali dei cibi"
+                f"prima di rispondere alla seguente domanda:"
+                f" |\n{message_text}"
+            )
 
         # Aggiungi logica per filtrare in base all'argomento della domanda
         if is_food_question(message_text):
