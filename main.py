@@ -26,7 +26,7 @@ from telegram.constants import ParseMode
 
 from src.chatGPT_response import write_chatgpt, write_chatgpt_for_dieta_info
 from src.connection import connect, connect_mysql
-from src.controls import control_tag, check_time_in_range
+from src.controls import control_tag, check_time_in_range, split_chunks
 from src.handle_reminder_data import save_user_food_response, send_week_reminder_message
 from src.handle_user_data import get_user_profile, create_new_user, ask_next_question, get_all_telegram_ids, \
     voice_recognizer, _clear, photo_recognizer, get_dieta_settimanale_ids, \
@@ -203,6 +203,10 @@ user_response_message = []
 # Variabile di stato per coordinare l'esecuzione tra i thread
 event_send_reminder = threading.Event()
 event_handle_response = threading.Event()
+
+MAX_MESSAGE_LENGTH = 400
+
+start_command_used = False
 
 if __name__ == '__main__':
 
@@ -458,28 +462,34 @@ if __name__ == '__main__':
         :rtype: Message
         """
 
-        global questions_and_fields, index
-        # setto l'evento a true
-        event.set()
-        telegram_id = message.chat.id
+        global questions_and_fields, index, start_command_used
+        if not start_command_used:
 
-        user_profile_start = get_user_profile(telegram_id)
-        print(user_profile_start)
-        username = message.chat.username
+            # setto l'evento a true
+            event.set()
+            telegram_id = message.chat.id
 
-        # Controllo se l'utente non esiste
-        if not user_profile_start:
-            # Se l'utente non esiste viene creato inserendo l'id telegram e il suo username
-            create_new_user(telegram_id, username)
+            user_profile_start = get_user_profile(telegram_id)
+            print(user_profile_start)
+            username = message.chat.username
 
-        # Inizia chiedendo il consenso ai dati
-        reply_markup = InlineKeyboardMarkup([
-            [InlineKeyboardButton("Si", callback_data='consenso_si'),
-             InlineKeyboardButton("No", callback_data='consenso_no')]
-        ])
-        consenso_message = ("Prima di cominciare con le domande di profilazione, dobbiamo ottenere il tuo consenso per "
-                            "l'uso dei dati. Acconsenti?")
-        bot_telegram.send_message(telegram_id, consenso_message, reply_markup=reply_markup)
+            # Controllo se l'utente non esiste
+            if not user_profile_start:
+                # Se l'utente non esiste viene creato inserendo l'id telegram e il suo username
+                create_new_user(telegram_id, username)
+
+            # Inizia chiedendo il consenso ai dati
+            reply_markup = InlineKeyboardMarkup([
+                [InlineKeyboardButton("Si", callback_data='consenso_si'),
+                 InlineKeyboardButton("No", callback_data='consenso_no')]
+            ])
+            consenso_message = ("Prima di cominciare con le domande di profilazione, dobbiamo ottenere il tuo consenso per "
+                                "l'uso dei dati. Acconsenti?")
+            bot_telegram.send_message(telegram_id, consenso_message, reply_markup=reply_markup)
+            start_command_used = True
+        else:
+            bot_telegram.send_message(message.chat.id, "Il comando di start è stato già utilizzato. Chiedimi ciò che desideri😊")
+
 
 
     # Funzione per gestire la risposta ai pulsanti di consenso
@@ -505,7 +515,7 @@ if __name__ == '__main__':
             # Utente ha rifiutato, puoi gestire di conseguenza
             bot_telegram.send_message(user_id, "Puoi utilizzare il bot ma non acconsentendo alla profilazione, "
                                                "risulterà meno efficiente😢")
-            index = 4
+            index = len(questions_and_fields) + 1
             event.clear()
 
 
@@ -529,8 +539,6 @@ if __name__ == '__main__':
         global mysql_connection, mysql_cursor, event, index, event_send_reminder
         user_response = str(message.text)
         telegram_id = message.chat.id
-        telegram_ids = get_all_telegram_ids()
-        current_time_reminder = datetime.now().time()
 
         try:
             if index <= len(questions_and_fields):
@@ -582,8 +590,25 @@ if __name__ == '__main__':
 
                             user_profile = get_user_profile(telegram_id)
                             print(user_profile)
-                            respost = write_chatgpt(openai, user_response, user_profile, mysql_cursor, telegram_id)
-                            bot_telegram.send_message(telegram_id, respost)
+
+                            response_chunks = write_chatgpt(bot_telegram, openai, user_response, user_profile,
+                                                            mysql_cursor, telegram_id)
+                            frase_is_food = "Mi dispiace, non sono in grado di rispondere a domande su questo argomento. Rispondo solo a domande riguardanti l'alimentazione."
+
+                            if response_chunks == frase_is_food:
+                                bot_telegram.send_message(telegram_id, frase_is_food)
+                            else:
+
+                                # Invia ciascun elemento della lista ogni 5 secondi
+                                for chunk in response_chunks:
+                                    # Suddividi il chunk in pezzi da 400 parole
+                                    splitted = split_chunks(chunk)
+
+                                    # Invia ciascun pezzo ogni 5 secondi
+                                    for split_chunk in splitted:
+                                        split_chunk += "..."
+                                        bot_telegram.send_message(telegram_id, split_chunk, trem.sleep(8))
+
                         elif message.content_type == 'voice':
                             voice_handler(message)
                         elif message.content_type == 'photo':
@@ -591,7 +616,7 @@ if __name__ == '__main__':
         except IndexError as ie:
             print(f"Index error: {ie}")
             bot_telegram.send_message(telegram_id,
-                                      "Il tuo profilo è completo. Grazie! Chiedimi ciò che desideri😊")
+                                      "Grazie! Ora il tuo profilo è completo. Chiedimi ciò che desideri😊")
             index +=1
             event.clear()
 

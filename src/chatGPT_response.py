@@ -10,9 +10,9 @@ import locale
 from src.controls import is_food_question
 
 locale.setlocale(locale.LC_TIME, 'it_IT')
+MAX_MESSAGE_LENGTH = 400
 
-
-def write_chatgpt(openai, message, profilo_utente, mysql_cursor, telegram_id):
+def write_chatgpt(bot_telegram, openai, message, profilo_utente, mysql_cursor, telegram_id):
     """
     Questa funzione serve per passare i messaggi dell'utente a chatgpt filtrandole con is_food_question e passando
     a chatgpt anche il profilo dell'utente e la dieta settimanale
@@ -58,7 +58,9 @@ def write_chatgpt(openai, message, profilo_utente, mysql_cursor, telegram_id):
             input_con_profilo_e_dieta = (
                 f"La mia età è: {eta} | La mia malattia o disturbo è: {', '.join(malattie)} | Io quando mangio o penso al "
                 f"cibo provo un sentimento: {emozione}"f" | {dieta_settimanale_text}"
-                f" | Mettiti nei panni di un nutrizionista,tieni conto della mia età, delle mie malattie o disturbi, "
+                f" | Devi scrivere che sei un'intelligenza artificiale. Mettiti nei panni di un nutrizionista ma non dire che ti stai mettendo"
+                f" nei panni di un nutrizionista e "
+                f"tieni conto della mia età, delle mie malattie o disturbi, "
                 f"l'emozione che provo quando mangio o penso al cibo e alla mia dieta settimanale considerando anche"
                 f" i valori nutrizionali dei cibi"
                 f" e adatta il tuo linguaggio "
@@ -67,8 +69,10 @@ def write_chatgpt(openai, message, profilo_utente, mysql_cursor, telegram_id):
             )
         if not eta and not malattie and not emozione:
             input_con_profilo_e_dieta = (
-                f"Considera che gli alimenti della mia dieta sono stati:{dieta_settimanale_text}"
-                f" | Mettiti nei panni di un nutrizionista e tieni conto della mia dieta settimanale considerando anche"
+                f"Devi scrivere che sei un'intelligenza artificiale. Considera che gli alimenti della mia dieta sono stati:{dieta_settimanale_text}"
+                f" | Mettiti nei panni di un nutrizionista e non scrivere che ti stai mettendo nei panni di un "
+                f"nutrizionista"
+                f" e tieni conto della mia dieta settimanale considerando anche"
                 f" i valori nutrizionali dei cibi"
                 f"prima di rispondere alla seguente domanda:"
                 f" |\n{message_text}"
@@ -90,11 +94,18 @@ def write_chatgpt(openai, message, profilo_utente, mysql_cursor, telegram_id):
                 # Ottieni la risposta grezza da OpenAI
                 raw_response = response["choices"][0]["message"]["content"]
 
-                # Aggiungi personalizzazioni in base alle informazioni del profilo
-                if emozione == 'felicità':
-                    raw_response += " Spero che tu possa continuare a goderti il tuo pasto felice!"
+                if len(raw_response) > MAX_MESSAGE_LENGTH:
+                    # Se è troppo lunga, spezza la risposta in parti più brevi
+                    chunks = [raw_response[i:i + MAX_MESSAGE_LENGTH] for i in
+                              range(0, len(raw_response), MAX_MESSAGE_LENGTH)]
 
-                return raw_response
+                    # Restituisci la lista di chunk
+                    return chunks
+                else:
+                    # Altrimenti, restituisci una lista di parole se la risposta non è vuota
+                    if raw_response.strip():
+                        return raw_response.split()  # Split sulla base degli spazi
+
             else:
                 # Gestisci risposte vuote o inaspettate
                 return "Mi dispiace, non ho ricevuto una risposta valida da OpenAI."
