@@ -8,6 +8,7 @@ import locale
 import os
 import pickle
 import threading
+import time as trem
 from datetime import datetime, time
 from io import BytesIO
 from queue import Queue
@@ -21,17 +22,15 @@ from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.pdfgen import canvas
 from reportlab.platypus import Paragraph
-from telebot.types import InputFile, InlineKeyboardMarkup, InlineKeyboardButton
-from telegram.constants import ParseMode
+from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 from src.chatGPT_response import write_chatgpt, write_chatgpt_for_dieta_info
 from src.connection import connect, connect_mysql
-from src.controls import control_tag, check_time_in_range, split_chunks
+from src.controls import check_time_in_range, split_chunks
 from src.handle_reminder_data import save_user_food_response, send_week_reminder_message
 from src.handle_user_data import get_user_profile, create_new_user, ask_next_question, get_all_telegram_ids, \
-    voice_recognizer, _clear, photo_recognizer, get_dieta_settimanale_ids, \
+    voice_recognizer, clear_audio, photo_recognizer, get_dieta_settimanale_ids, \
     get_dieta_settimanale_profile
-import time as trem
 
 
 def generate_all_weekly_diets_pdf(message):
@@ -155,12 +154,22 @@ EDIT_COMMAND = 'modifica'
 PROFILO_COMMAND = 'profilo'
 REPORT_COMMAND = 'report'
 
+reply_markup = InlineKeyboardMarkup([
+    [InlineKeyboardButton("Felicità", callback_data='emozione_felicità')],
+    [InlineKeyboardButton("Tristezza", callback_data='emozione_tristezza')],
+    [InlineKeyboardButton("Indifferenza", callback_data='emozione_indifferenza')],
+    [InlineKeyboardButton("Ansia", callback_data='emozione_ansia')],
+    [InlineKeyboardButton("Paura", callback_data='emozione_paura')],
+    [InlineKeyboardButton("Rabbia", callback_data='emozione_rabbia')],
+    [InlineKeyboardButton("Disgusto", callback_data='emozione_disgusto')],
+    # Aggiungi altri pulsanti per diverse emozioni
+])
+
 # Domande da porre all'utente durante la profilazione o modifica dei dati del profilo
 questions_and_fields = [
     ('Qual è la tua età?', 'eta'),
     ('Quali sono le tue patologie o disturbi?', 'malattie'),
-    ('Che sentimento provi mentre mangi o pensi al cibo? Indicalo scrivendo: tristezza, indifferenza, ansia, felicità',
-     'emozione')
+    (reply_markup, 'emozione')
 ]
 
 # Periodo giorno
@@ -207,6 +216,9 @@ event_handle_response = threading.Event()
 MAX_MESSAGE_LENGTH = 400
 
 start_command_used = False
+
+frase_is_food = ("Mi dispiace, non sono in grado di rispondere a domande su questo "
+                 "argomento. Rispondo solo a domande riguardanti l'alimentazione.")
 
 if __name__ == '__main__':
 
@@ -479,17 +491,18 @@ if __name__ == '__main__':
                 create_new_user(telegram_id, username)
 
             # Inizia chiedendo il consenso ai dati
-            reply_markup = InlineKeyboardMarkup([
+            reply_markup_consenso = InlineKeyboardMarkup([
                 [InlineKeyboardButton("Si", callback_data='consenso_si'),
                  InlineKeyboardButton("No", callback_data='consenso_no')]
             ])
-            consenso_message = ("Prima di cominciare con le domande di profilazione, dobbiamo ottenere il tuo consenso per "
-                                "l'uso dei dati. Acconsenti?")
-            bot_telegram.send_message(telegram_id, consenso_message, reply_markup=reply_markup)
+            consenso_message = (
+                "Prima di cominciare con le domande di profilazione, dobbiamo ottenere il tuo consenso per "
+                "l'uso dei dati. Acconsenti?")
+            bot_telegram.send_message(telegram_id, consenso_message, reply_markup=reply_markup_consenso)
             start_command_used = True
         else:
-            bot_telegram.send_message(message.chat.id, "Il comando di start è stato già utilizzato. Chiedimi ciò che desideri😊")
-
+            bot_telegram.send_message(message.chat.id,
+                                      "Il comando di start è stato già utilizzato. Chiedimi ciò che desideri😊")
 
 
     # Funzione per gestire la risposta ai pulsanti di consenso
@@ -498,6 +511,7 @@ if __name__ == '__main__':
         global index
         user_id = call.from_user.id
         consenso_answer = call.data
+        emozione_answer = call.data
         telegram_id = call.from_user.id
 
         if consenso_answer == 'consenso_si':
@@ -517,6 +531,18 @@ if __name__ == '__main__':
                                                "risulterà meno efficiente😢")
             index = len(questions_and_fields) + 1
             event.clear()
+        # Recupera il testo del pulsante dal callback data
+        elif emozione_answer.startswith('emozione_'):
+            emozione_selezionata = emozione_answer[len('emozione_'):]
+            update_query = f"UPDATE utenti SET {questions_and_fields[index - 1][1]} = %s WHERE telegram_id = %s"
+            mysql_cursor.execute(update_query, (emozione_selezionata, telegram_id))
+            # Commit delle modifiche al database
+            mysql_connection.commit()
+
+            confirmation_message = f"Grazie! 😊 La tua risposta per il campo <b>{questions_and_fields[index - 1][1]}</b> è: <b>{emozione_selezionata}</b>"
+            bot_telegram.send_message(telegram_id, confirmation_message, parse_mode='HTML', disable_notification=True)
+            print(index.__str__() + "callback_data")
+            index += 1
 
 
     # Gestisci altri possibili callback_data
@@ -541,18 +567,32 @@ if __name__ == '__main__':
         telegram_id = message.chat.id
 
         try:
-            if index <= len(questions_and_fields):
+            if index < len(questions_and_fields):
+
                 # Esecuzione della query per aggiornare il profilo dell'utente nel database
                 update_query = f"UPDATE utenti SET {questions_and_fields[index - 1][1]} = %s WHERE telegram_id = %s"
                 mysql_cursor.execute(update_query, (user_response, telegram_id))
                 # Commit delle modifiche al database
                 mysql_connection.commit()
-                confirmation_message = f"{questions_and_fields[index - 1][1]} salvat*: {user_response}"
-                bot_telegram.send_message(telegram_id, confirmation_message)
+
+                confirmation_message = f"Grazie! 😊 La tua risposta per il campo <b>{questions_and_fields[index - 1][1]}</b> è: <b>{user_response}</b>"
+                bot_telegram.send_message(telegram_id, confirmation_message, parse_mode='HTML',
+                                          disable_notification=True)
                 # Passa alla prossima domanda se ci sono ancora domande
                 question, field = questions_and_fields[index]
-                bot_telegram.send_message(telegram_id, question)
-                index += 1
+
+                if field == 'emozione':
+                    bot_telegram.send_message(telegram_id,
+                                              "Che emozione provi mentre mangi o pensi al cibo? Seleziona un'emozione:",
+                                              reply_markup=reply_markup)
+                    print(index.__str__() + "emozione_question")
+                    index += 1
+
+                else:
+                    bot_telegram.send_message(telegram_id, question)
+                    index += 1
+                    print(index.__str__() + "not_emozione_question")
+
                 print("handle_profile_response" + index.__str__())
 
             elif index > len(questions_and_fields):
@@ -581,9 +621,22 @@ if __name__ == '__main__':
                             f"Considera che in questa data {data_messaggio} ho mangiato: "
                             f"{message.reply_to_message.text}. In riferimento a quella data: {user_response}"
                         )
-                        respost = write_chatgpt(openai, user_response_reply, user_profile, mysql_cursor, telegram_id)
-                        print(user_response_reply)
-                        bot_telegram.send_message(telegram_id, respost)
+                        response_chunks = write_chatgpt(bot_telegram, openai, user_response_reply, user_profile,
+                                                        mysql_cursor, telegram_id)
+
+                        if response_chunks == frase_is_food:
+                            bot_telegram.send_message(telegram_id, frase_is_food)
+                        else:
+
+                            # Invia ciascun elemento della lista ogni 5 secondi
+                            for chunk in response_chunks:
+                                # Suddividi il chunk in pezzi da 400 parole
+                                splitted = split_chunks(chunk)
+
+                                # Invia ciascun pezzo ogni 5 secondi
+                                for split_chunk in splitted:
+                                    split_chunk += "..."
+                                    bot_telegram.send_message(telegram_id, split_chunk, trem.sleep(8))
                     else:
 
                         if message.content_type == 'text':
@@ -593,7 +646,6 @@ if __name__ == '__main__':
 
                             response_chunks = write_chatgpt(bot_telegram, openai, user_response, user_profile,
                                                             mysql_cursor, telegram_id)
-                            frase_is_food = "Mi dispiace, non sono in grado di rispondere a domande su questo argomento. Rispondo solo a domande riguardanti l'alimentazione."
 
                             if response_chunks == frase_is_food:
                                 bot_telegram.send_message(telegram_id, frase_is_food)
@@ -617,7 +669,7 @@ if __name__ == '__main__':
             print(f"Index error: {ie}")
             bot_telegram.send_message(telegram_id,
                                       "Grazie! Ora il tuo profilo è completo. Chiedimi ciò che desideri😊")
-            index +=1
+            index += 1
             event.clear()
 
         except Exception as e:
@@ -682,7 +734,7 @@ def handle_reminder_response(message):
                     text = voice_recognizer()
                     save_user_food_response(bot_telegram, mysql_cursor, mysql_connection, telegram_id, meal_type,
                                             text, app_id, app_key)
-                    _clear()
+                    clear_audio()
                 elif message.content_type == 'photo':
                     text = photo_recognizer(message, bot_telegram)
                     save_user_food_response(bot_telegram, mysql_cursor, mysql_connection, telegram_id, meal_type,
@@ -709,7 +761,7 @@ def handle_reminder_response(message):
                     text = voice_recognizer()
                     save_user_food_response(bot_telegram, mysql_cursor, mysql_connection, telegram_id, meal_type,
                                             text, app_id, app_key)
-                    _clear()
+                    clear_audio()
                 elif message.content_type == 'photo':
                     text = photo_recognizer(message, bot_telegram)
                     save_user_food_response(bot_telegram, mysql_cursor, mysql_connection, telegram_id, meal_type,
@@ -738,7 +790,7 @@ def handle_reminder_response(message):
                     print(text)
                     save_user_food_response(bot_telegram, mysql_cursor, mysql_connection, telegram_id, meal_type,
                                             text, app_id, app_key)
-                    _clear()
+                    clear_audio()
                 elif message.content_type == 'photo':
                     text = photo_recognizer(message, bot_telegram)
                     save_user_food_response(bot_telegram, mysql_cursor, mysql_connection, telegram_id, meal_type,
@@ -786,10 +838,24 @@ def voice_handler(message):
 
         user_profile = get_user_profile(telegram_id)
         print(user_profile)
-        respost = write_chatgpt(openai, text, user_profile, mysql_cursor, telegram_id)
-        bot_telegram.send_message(telegram_id, respost)
+        response_chunks = write_chatgpt(bot_telegram, openai, text, user_profile,
+                                        mysql_cursor, telegram_id)
+
+        if response_chunks == frase_is_food:
+            bot_telegram.send_message(telegram_id, frase_is_food)
+        else:
+
+            # Invia ciascun elemento della lista ogni 5 secondi
+            for chunk in response_chunks:
+                # Suddividi il chunk in pezzi da 400 parole
+                splitted = split_chunks(chunk)
+
+                # Invia ciascun pezzo ogni 5 secondi
+                for split_chunk in splitted:
+                    split_chunk += "..."
+                    bot_telegram.send_message(telegram_id, split_chunk, trem.sleep(8))
         # chiamare il metodo per cancellare i file .ogg e .wav generati
-        _clear()
+        clear_audio()
 
 
 @bot_telegram.message_handler(func=lambda message: True)
@@ -811,14 +877,42 @@ def photo_handler(message):
         results = photo_result + message.caption
         user_profile = get_user_profile(telegram_id)
         print(results)
-        respost = write_chatgpt(openai, results, user_profile, mysql_cursor, telegram_id)
-        bot_telegram.send_message(telegram_id, respost)
+        response_chunks = write_chatgpt(bot_telegram, openai, results, user_profile,
+                                        mysql_cursor, telegram_id)
+
+        if response_chunks == frase_is_food:
+            bot_telegram.send_message(telegram_id, frase_is_food)
+        else:
+
+            # Invia ciascun elemento della lista ogni 5 secondi
+            for chunk in response_chunks:
+                # Suddividi il chunk in pezzi da 400 parole
+                splitted = split_chunks(chunk)
+
+                # Invia ciascun pezzo ogni 5 secondi
+                for split_chunk in splitted:
+                    split_chunk += "..."
+                    bot_telegram.send_message(telegram_id, split_chunk, trem.sleep(8))
     else:
         results = photo_result
         user_profile = get_user_profile(telegram_id)
         print(results)
-        respost = write_chatgpt(openai, results, user_profile, mysql_cursor, telegram_id)
-        bot_telegram.send_message(telegram_id, respost)
+        response_chunks = write_chatgpt(bot_telegram, openai, results, user_profile,
+                                        mysql_cursor, telegram_id)
+
+        if response_chunks == frase_is_food:
+            bot_telegram.send_message(telegram_id, frase_is_food)
+        else:
+
+            # Invia ciascun elemento della lista ogni 5 secondi
+            for chunk in response_chunks:
+                # Suddividi il chunk in pezzi da 400 parole
+                splitted = split_chunks(chunk)
+
+                # Invia ciascun pezzo ogni 5 secondi
+                for split_chunk in splitted:
+                    split_chunk += "..."
+                    bot_telegram.send_message(telegram_id, split_chunk, trem.sleep(8))
 
 
 def send_reminder_message(event, bot_telegram, ORA_COLAZIONE_START, ORA_COLAZIONE_END, ORA_PRANZO_START, ORA_PRANZO_END,

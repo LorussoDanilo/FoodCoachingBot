@@ -322,7 +322,7 @@ def voice_recognizer():
 
 
 # Metodo per cancellare i file .ogg e .wav generati
-def _clear():
+def clear_audio():
     """
         Questa funzione permette di cancellare i file audio salvati temporaneamente
 

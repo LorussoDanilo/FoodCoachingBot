@@ -124,7 +124,7 @@ def create_tables(cursor, database_name):
           nome_utente VARCHAR(255),
           eta INT,
           malattie VARCHAR(255),
-          emozione VARCHAR(255) CHECK (emozione IN ('tristezza', 'indifferenza', 'ansia', 'felicità'))
+          emozione VARCHAR(255) CHECK (emozione IN ('tristezza', 'indifferenza', 'ansia', 'felicità', 'paura', 'rabbia', 'disgusto'))
         );
         """)
 
