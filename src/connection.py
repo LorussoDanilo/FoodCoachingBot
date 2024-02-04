@@ -124,7 +124,11 @@ def create_tables(cursor, database_name):
           nome_utente VARCHAR(255),
           eta INT,
           malattie VARCHAR(255),
-          emozione VARCHAR(255) CHECK (emozione IN ('tristezza', 'indifferenza', 'ansia', 'felicità', 'paura', 'rabbia', 'disgusto'))
+          emozione VARCHAR(255) CHECK (emozione IN ('tristezza', 'indifferenza', 'ansia', 'felicità', 'paura', 'rabbia', 'disgusto')),
+          peso INT,
+          altezza INT,
+          stile_vita VARCHAR(255) CHECK (stile_vita IN ('sedentario', 'bilanciato', 'sportivo')), 
+          obiettivo VARCHAR(255) CHECK (obiettivo IN ('curiosità', 'dimagrire', 'consigli_alimentari_per_dieta_sana', 'consigli_specifici_per_le_malattie'))
         );
         """)
 

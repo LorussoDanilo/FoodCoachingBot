@@ -15,6 +15,7 @@ from queue import Queue
 
 import matplotlib.pyplot as plt
 import pandas as pd
+import self
 from PIL import Image
 from dotenv import load_dotenv
 from mysql.connector import IntegrityError, errorcode
@@ -30,7 +31,7 @@ from src.controls import check_time_in_range, split_chunks
 from src.handle_reminder_data import save_user_food_response, send_week_reminder_message
 from src.handle_user_data import get_user_profile, create_new_user, ask_next_question, get_all_telegram_ids, \
     voice_recognizer, clear_audio, photo_recognizer, get_dieta_settimanale_ids, \
-    get_dieta_settimanale_profile
+    get_dieta_settimanale_profile, ProfilazioneBot
 
 
 def generate_all_weekly_diets_pdf(message):
@@ -154,24 +155,6 @@ EDIT_COMMAND = 'modifica'
 PROFILO_COMMAND = 'profilo'
 REPORT_COMMAND = 'report'
 
-reply_markup = InlineKeyboardMarkup([
-    [InlineKeyboardButton("Felicità", callback_data='emozione_felicità')],
-    [InlineKeyboardButton("Tristezza", callback_data='emozione_tristezza')],
-    [InlineKeyboardButton("Indifferenza", callback_data='emozione_indifferenza')],
-    [InlineKeyboardButton("Ansia", callback_data='emozione_ansia')],
-    [InlineKeyboardButton("Paura", callback_data='emozione_paura')],
-    [InlineKeyboardButton("Rabbia", callback_data='emozione_rabbia')],
-    [InlineKeyboardButton("Disgusto", callback_data='emozione_disgusto')],
-    # Aggiungi altri pulsanti per diverse emozioni
-])
-
-# Domande da porre all'utente durante la profilazione o modifica dei dati del profilo
-questions_and_fields = [
-    ('Qual è la tua età?', 'eta'),
-    ('Quali sono le tue patologie o disturbi?', 'malattie'),
-    (reply_markup, 'emozione')
-]
-
 # Periodo giorno
 meal_type = None
 
@@ -190,14 +173,11 @@ api_key = os.getenv('GOOGLE_CLOUD_API_KEY')
 # Variabile per gestire le funzionalità del chatbot. Serve per capire quando una funzionalità deve cominciare
 event = threading.Event()
 
-# Indice delle domande
-index = 0
-
 # Inizializzazione degli intervalli orari per inviare i reminder
 ORA_COLAZIONE_START = time(8, 0)
 ORA_COLAZIONE_END = time(9, 0)
 ORA_PRANZO_START = time(11, 0)
-ORA_PRANZO_END = time(12, 0)
+ORA_PRANZO_END = time(12, 40)
 ORA_CENA_START = time(16, 30)
 ORA_CENA_END = time(23, 50)
 
@@ -219,6 +199,36 @@ start_command_used = False
 
 frase_is_food = ("Mi dispiace, non sono in grado di rispondere a domande su questo "
                  "argomento. Rispondo solo a domande riguardanti l'alimentazione.")
+
+profilazione_bot = ProfilazioneBot(bot_telegram)
+
+reply_markup_emozioni = InlineKeyboardMarkup([
+    [InlineKeyboardButton("Felicità", callback_data='emozione_felicità')],
+    [InlineKeyboardButton("Tristezza", callback_data='emozione_tristezza')],
+    [InlineKeyboardButton("Indifferenza", callback_data='emozione_indifferenza')],
+    [InlineKeyboardButton("Ansia", callback_data='emozione_ansia')],
+    [InlineKeyboardButton("Paura", callback_data='emozione_paura')],
+    [InlineKeyboardButton("Rabbia", callback_data='emozione_rabbia')],
+    [InlineKeyboardButton("Disgusto", callback_data='emozione_disgusto')],
+    # Aggiungi altri pulsanti per diverse emozioni
+])
+
+reply_markup_stile_vita = InlineKeyboardMarkup([
+    [InlineKeyboardButton("Sedentario", callback_data='stile_vita_sedentario')],
+    [InlineKeyboardButton("Bilanciato", callback_data='stile_vita_bilanciato')],
+    [InlineKeyboardButton("Sportivo", callback_data='stile_vita_sportivo')]
+    # Aggiungi altri pulsanti per diverse emozioni
+])
+
+reply_markup_obiettivo = InlineKeyboardMarkup([
+    [InlineKeyboardButton("Curiosità", callback_data='obiettivo_curiosità')],
+    [InlineKeyboardButton("Dimagrire", callback_data='obiettivo_dimagrire')],
+    [InlineKeyboardButton("Consigli alimentari per dieta sana",
+                          callback_data='obiettivo_consigli_alimentari_per_dieta_sana')],
+    [InlineKeyboardButton("Consigli specifici per le malattie",
+                          callback_data='obiettivo_consigli_specifici_per_le_malattie')]
+    # Aggiungi altri pulsanti per diverse emozioni
+])
 
 if __name__ == '__main__':
 
@@ -453,7 +463,7 @@ if __name__ == '__main__':
         bot_telegram.send_message(telegram_id, message.chat.username + " " + "modifica i dati del tuo profilo!")
 
         # Inizia a fare domande per l'aggiornamento delle informazioni
-        ask_next_question(telegram_id, bot_telegram, questions_and_fields, index_edit)
+        # ask_next_question(telegram_id, bot_telegram, questions_and_fields, index_edit)
 
         reminder_message_thread = threading.Thread(target=send_reminder_message, daemon=True, args=(
             event, bot_telegram, ORA_COLAZIONE_START, ORA_COLAZIONE_END, ORA_PRANZO_START, ORA_PRANZO_END,
@@ -474,11 +484,11 @@ if __name__ == '__main__':
         :rtype: Message
         """
 
-        global questions_and_fields, index, start_command_used
+        global start_command_used
         if not start_command_used:
 
-            # setto l'evento a true
             event.set()
+
             telegram_id = message.chat.id
 
             user_profile_start = get_user_profile(telegram_id)
@@ -505,46 +515,6 @@ if __name__ == '__main__':
                                       "Il comando di start è stato già utilizzato. Chiedimi ciò che desideri😊")
 
 
-    # Funzione per gestire la risposta ai pulsanti di consenso
-    @bot_telegram.callback_query_handler(func=lambda call: True)
-    def handle_consenso_buttons(call):
-        global index
-        user_id = call.from_user.id
-        consenso_answer = call.data
-        emozione_answer = call.data
-        telegram_id = call.from_user.id
-
-        if consenso_answer == 'consenso_si':
-            # Utente ha acconsentito, puoi iniziare con le domande di profilazione
-            bot_telegram.send_message(user_id, "Ottimo! Cominciamo con le domande di profilazione.")
-            # Inizia chiedendo la prima domanda
-
-            question, field = questions_and_fields[index]
-            bot_telegram.send_message(telegram_id, question)
-            # Incremento dell'indice per proseguire nelle domande
-
-            index += 1
-            # Aggiungi il codice per iniziare le domande di profilazione
-        elif consenso_answer == 'consenso_no':
-            # Utente ha rifiutato, puoi gestire di conseguenza
-            bot_telegram.send_message(user_id, "Puoi utilizzare il bot ma non acconsentendo alla profilazione, "
-                                               "risulterà meno efficiente😢")
-            index = len(questions_and_fields) + 1
-            event.clear()
-        # Recupera il testo del pulsante dal callback data
-        elif emozione_answer.startswith('emozione_'):
-            emozione_selezionata = emozione_answer[len('emozione_'):]
-            update_query = f"UPDATE utenti SET {questions_and_fields[index - 1][1]} = %s WHERE telegram_id = %s"
-            mysql_cursor.execute(update_query, (emozione_selezionata, telegram_id))
-            # Commit delle modifiche al database
-            mysql_connection.commit()
-
-            confirmation_message = f"Grazie! 😊 La tua risposta per il campo <b>{questions_and_fields[index - 1][1]}</b> è: <b>{emozione_selezionata}</b>"
-            bot_telegram.send_message(telegram_id, confirmation_message, parse_mode='HTML', disable_notification=True)
-            print(index.__str__() + "callback_data")
-            index += 1
-
-
     # Gestisci altri possibili callback_data
 
     @bot_telegram.message_handler(func=lambda message: True, content_types=['text', 'voice', 'photo'])
@@ -562,40 +532,16 @@ if __name__ == '__main__':
         :return: domande per la profilazione dell'utente, reminder e passa le risposte a chatgpt
         :rtype: Message
         """
-        global mysql_connection, mysql_cursor, event, index, event_send_reminder
+        global mysql_connection, mysql_cursor, event, event_send_reminder
         user_response = str(message.text)
         telegram_id = message.chat.id
+        current_time_reminder = datetime.now().time()
 
         try:
-            if index < len(questions_and_fields):
-
-                # Esecuzione della query per aggiornare il profilo dell'utente nel database
-                update_query = f"UPDATE utenti SET {questions_and_fields[index - 1][1]} = %s WHERE telegram_id = %s"
-                mysql_cursor.execute(update_query, (user_response, telegram_id))
-                # Commit delle modifiche al database
-                mysql_connection.commit()
-
-                confirmation_message = f"Grazie! 😊 La tua risposta per il campo <b>{questions_and_fields[index - 1][1]}</b> è: <b>{user_response}</b>"
-                bot_telegram.send_message(telegram_id, confirmation_message, parse_mode='HTML',
-                                          disable_notification=True)
-                # Passa alla prossima domanda se ci sono ancora domande
-                question, field = questions_and_fields[index]
-
-                if field == 'emozione':
-                    bot_telegram.send_message(telegram_id,
-                                              "Che emozione provi mentre mangi o pensi al cibo? Seleziona un'emozione:",
-                                              reply_markup=reply_markup)
-                    print(index.__str__() + "emozione_question")
-                    index += 1
-
-                else:
-                    bot_telegram.send_message(telegram_id, question)
-                    index += 1
-                    print(index.__str__() + "not_emozione_question")
-
-                print("handle_profile_response" + index.__str__())
-
-            elif index > len(questions_and_fields):
+            if not profilazione_bot.profile_completed:
+                # Aggiungi un input per simulare la risposta dell'utente
+                profilazione_bot.gestisci_risposta(telegram_id, user_response)
+            else:
                 if event.is_set():
                     event_send_reminder.set()
                     reminder_message_thread = threading.Thread(target=send_reminder_message, daemon=True, args=(
@@ -607,6 +553,7 @@ if __name__ == '__main__':
                     reminder_thread.start()
 
                 else:
+
                     reminder_week_message_thread = threading.Thread(target=send_week_reminder_message, daemon=True,
                                                                     args=(event, bot_telegram,))
                     reminder_week_message_thread.start()
@@ -638,39 +585,39 @@ if __name__ == '__main__':
                                     split_chunk += "..."
                                     bot_telegram.send_message(telegram_id, split_chunk, trem.sleep(8))
                     else:
+                        if not check_time_in_range(current_time_reminder, ORA_COLAZIONE_START,
+                                                   ORA_COLAZIONE_END) or check_time_in_range(current_time_reminder,
+                                                                                             ORA_PRANZO_START,
+                                                                                             ORA_PRANZO_END) or check_time_in_range(
+                                current_time_reminder, ORA_CENA_START, ORA_CENA_END):
+                            if message.content_type == 'text':
 
-                        if message.content_type == 'text':
+                                user_profile = get_user_profile(telegram_id)
+                                print(user_profile)
 
-                            user_profile = get_user_profile(telegram_id)
-                            print(user_profile)
+                                response_chunks = write_chatgpt(bot_telegram, openai, user_response, user_profile,
+                                                                mysql_cursor, telegram_id)
 
-                            response_chunks = write_chatgpt(bot_telegram, openai, user_response, user_profile,
-                                                            mysql_cursor, telegram_id)
+                                if response_chunks == frase_is_food:
+                                    bot_telegram.send_message(telegram_id, frase_is_food)
+                                else:
 
-                            if response_chunks == frase_is_food:
-                                bot_telegram.send_message(telegram_id, frase_is_food)
+                                    # Invia ciascun elemento della lista ogni 5 secondi
+                                    for chunk in response_chunks:
+                                        # Suddividi il chunk in pezzi da 400 parole
+                                        splitted = split_chunks(chunk)
+
+                                        # Invia ciascun pezzo ogni 5 secondi
+                                        for split_chunk in splitted:
+                                            split_chunk += "..."
+                                            bot_telegram.send_message(telegram_id, split_chunk, trem.sleep(8))
+
+                            elif message.content_type == 'voice':
+                                voice_handler(message)
+                            elif message.content_type == 'photo':
+                                photo_handler(message)
                             else:
-
-                                # Invia ciascun elemento della lista ogni 5 secondi
-                                for chunk in response_chunks:
-                                    # Suddividi il chunk in pezzi da 400 parole
-                                    splitted = split_chunks(chunk)
-
-                                    # Invia ciascun pezzo ogni 5 secondi
-                                    for split_chunk in splitted:
-                                        split_chunk += "..."
-                                        bot_telegram.send_message(telegram_id, split_chunk, trem.sleep(8))
-
-                        elif message.content_type == 'voice':
-                            voice_handler(message)
-                        elif message.content_type == 'photo':
-                            photo_handler(message)
-        except IndexError as ie:
-            print(f"Index error: {ie}")
-            bot_telegram.send_message(telegram_id,
-                                      "Grazie! Ora il tuo profilo è completo. Chiedimi ciò che desideri😊")
-            index += 1
-            event.clear()
+                                event.set()
 
         except Exception as e:
             print(f"Vincolo di integrità violato: {e}")
