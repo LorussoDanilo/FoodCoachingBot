@@ -6,22 +6,21 @@ testuali e foto
 """
 
 import locale
+import logging
 import os
+import subprocess
 import tempfile
+import traceback
 from datetime import datetime, time
 from sqlite3 import IntegrityError
 
 import requests
+import speech_recognition as sr
 from mysql.connector import errorcode
 from roboflow import Roboflow
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-from src.connection import connect_mysql, connect
-import traceback
-import subprocess
-import speech_recognition as sr
-import logging
-
+from src.connection import connect_mysql
 from src.controls import check_time_in_range
 
 handle_user_response_gpt_enabled = False
@@ -50,6 +49,54 @@ ORA_PRANZO_START = time(11, 0)
 ORA_PRANZO_END = time(12, 40)
 ORA_CENA_START = time(16, 30)
 ORA_CENA_END = time(23, 50)
+
+reply_markup_emozioni = InlineKeyboardMarkup([
+    [
+        InlineKeyboardButton("Felicità", callback_data='emozione_felicità'),
+        InlineKeyboardButton("Tristezza", callback_data='emozione_tristezza'),
+        InlineKeyboardButton("Indifferenza", callback_data='emozione_indifferenza')
+    ],
+    [
+        InlineKeyboardButton("Ansia", callback_data='emozione_ansia'),
+        InlineKeyboardButton("Paura", callback_data='emozione_paura'),
+        InlineKeyboardButton("Rabbia", callback_data='emozione_rabbia')
+    ],
+    [
+        InlineKeyboardButton("Disgusto", callback_data='emozione_disgusto')
+        # Aggiungi altri pulsanti per diverse emozioni, se necessario
+    ]
+])
+
+reply_markup_stile_vita = InlineKeyboardMarkup([
+    [InlineKeyboardButton("Sedentario", callback_data='stile_vita_sedentario')],
+    [InlineKeyboardButton("Bilanciato", callback_data='stile_vita_bilanciato')],
+    [InlineKeyboardButton("Sportivo", callback_data='stile_vita_sportivo')]
+    # Aggiungi altri pulsanti per diverse emozioni
+])
+
+reply_markup_obiettivo = InlineKeyboardMarkup([
+    [InlineKeyboardButton("Curiosità", callback_data='obiettivo_curiosità')],
+    [InlineKeyboardButton("Dimagrire", callback_data='obiettivo_dimagrire')],
+    [InlineKeyboardButton("Consigli alimentari per dieta sana",
+                          callback_data='obiettivo_consigli_alimentari_per_dieta_sana')],
+    [InlineKeyboardButton("Consigli specifici per le malattie",
+                          callback_data='obiettivo_consigli_specifici_per_le_malattie')]
+    # Aggiungi altri pulsanti per diverse emozioni
+])
+
+# Domande da porre all'utente durante la profilazione o modifica dei dati del profilo
+questions_and_fields = [
+    ('Qual è la tua età? 🧍‍♂️', 'eta'),
+    ('Quali sono le tue patologie o disturbi? 🩺', 'malattie'),
+    ('Quale emozione provi mentre mangi o pensi al cibo? 🧠', 'emozione'),
+    ('Qual è il tuo peso in Kg? ⚖️', 'peso'),
+    ('Qual è la tua altezza in cm? 📏', 'altezza'),
+    ('Qual è il tuo stile di vita? 🚶', 'stile_vita'),
+    ('Perchè vorresti utilizzare questo servizio? 🎯', 'obiettivo'),
+]
+
+mysql_connection, mysql_cursor = connect_mysql()
+
 
 def create_new_user(telegram_id, username):
     """
@@ -211,7 +258,7 @@ def get_all_telegram_ids():
 
 
 # Update data Funzione per fare domande per l'aggiornamento delle informazioni
-def ask_next_question(telegram_id, bot, questions_and_fields, index):
+def ask_next_question(telegram_id, bot, index):
     """
     Questa funzione permette di fare le domande di profilazione all'utente
 
@@ -219,8 +266,6 @@ def ask_next_question(telegram_id, bot, questions_and_fields, index):
     :type telegram_id: int
     :param bot: permette di usare i metodi della libreria Telebot
     :type bot: Telebot
-    :param questions_and_fields: lista che contiene le domande e i campi della tabella utenti a cui si riferiscono
-    :type questions_and_fields: list
     :param index: indice della domanda che viene fatta all'utente che viene incrementato ciclicamente
     :type index: int
 
@@ -285,7 +330,7 @@ def ask_next_question(telegram_id, bot, questions_and_fields, index):
             mysql_connection.close()
 
             # Passa alla prossima domanda se ci sono ancora domande
-            ask_next_question(telegram_id_update, bot_update, questions_and_fields_update, index_update + 1)
+            ask_next_question(telegram_id_update, bot_update, index_update + 1)
 
         except Exception as e:
             print(f"Errore durante la gestione della risposta: {e}")
@@ -404,52 +449,6 @@ def photo_recognizer(message, bot_telegram):
         bot_telegram.reply_to(message, "Si è verificato un errore durante il riconoscimento dell'immagine.")
 
 
-reply_markup_emozioni = InlineKeyboardMarkup([
-    [
-        InlineKeyboardButton("Felicità", callback_data='emozione_felicità'),
-        InlineKeyboardButton("Tristezza", callback_data='emozione_tristezza'),
-        InlineKeyboardButton("Indifferenza", callback_data='emozione_indifferenza')
-    ],
-    [
-        InlineKeyboardButton("Ansia", callback_data='emozione_ansia'),
-        InlineKeyboardButton("Paura", callback_data='emozione_paura'),
-        InlineKeyboardButton("Rabbia", callback_data='emozione_rabbia')
-    ],
-    [
-        InlineKeyboardButton("Disgusto", callback_data='emozione_disgusto')
-        # Aggiungi altri pulsanti per diverse emozioni, se necessario
-    ]
-])
-
-reply_markup_stile_vita = InlineKeyboardMarkup([
-    [InlineKeyboardButton("Sedentario", callback_data='stile_vita_sedentario')],
-    [InlineKeyboardButton("Bilanciato", callback_data='stile_vita_bilanciato')],
-    [InlineKeyboardButton("Sportivo", callback_data='stile_vita_sportivo')]
-    # Aggiungi altri pulsanti per diverse emozioni
-])
-
-reply_markup_obiettivo = InlineKeyboardMarkup([
-    [InlineKeyboardButton("Curiosità", callback_data='obiettivo_curiosità')],
-    [InlineKeyboardButton("Dimagrire", callback_data='obiettivo_dimagrire')],
-    [InlineKeyboardButton("Consigli alimentari per dieta sana",
-                          callback_data='obiettivo_consigli_alimentari_per_dieta_sana')],
-    [InlineKeyboardButton("Consigli specifici per le malattie",
-                          callback_data='obiettivo_consigli_specifici_per_le_malattie')]
-    # Aggiungi altri pulsanti per diverse emozioni
-])
-
-# Domande da porre all'utente durante la profilazione o modifica dei dati del profilo
-questions_and_fields = [
-    ('Qual è la tua età?', 'eta'),
-    ('Quali sono le tue patologie o disturbi?', 'malattie'),
-    ('Quali emozioni provi mentre mangi o pensi al cibo?', 'emozione'),
-    ('Qual è il tuo peso in Kg? ', 'peso'),
-    ('Qual è la tua altezza in cm? ', 'altezza'),
-    ('Qual è il tuo stile di vita?', 'stile_vita'),
-    ('Perchè vorresti utilizzare questo servizio?', 'obiettivo'),
-]
-
-mysql_connection, mysql_cursor = connect_mysql()
 
 
 class ProfilazioneBot:
@@ -469,10 +468,10 @@ class ProfilazioneBot:
             user_id = call.from_user.id
             user_response = call.data
             current_time_reminder = datetime.now().time()
-            print("user_id_buttons")
+            print(self.index)
             if user_response == 'consenso_si':
                 # Utente ha acconsentito, puoi iniziare con le domande di profilazione
-                bot_telegram.send_message(user_id, "Ottimo! Cominciamo con le domande di profilazione.")
+                bot_telegram.send_message(user_id, "Ottimo! Cominciamo con le domande di profilazione 👤")
                 self.invia_domanda_attuale(user_id)  # Inizia chiedendo la prima domanda
             if user_response == 'consenso_no':
                 # Utente ha rifiutato, puoi gestire di conseguenza
@@ -481,16 +480,16 @@ class ProfilazioneBot:
                                           "risulterà meno efficiente😢")
                 if check_time_in_range(current_time_reminder, ORA_COLAZIONE_START, ORA_COLAZIONE_END):
                     bot_telegram.send_message(user_id,
-                                              "Buongiorno! Cosa hai mangiato a colazione? Indica prima del cibo la "
+                                              "Colazione time! 🥛 Cosa hai mangiato a colazione? \n⚠️ Indica prima del cibo la "
                                               "quantità.")
 
                 elif check_time_in_range(current_time_reminder, ORA_PRANZO_START, ORA_PRANZO_END):
                     bot_telegram.send_message(user_id,
-                                              "Pranzo time! Cosa hai mangiato a pranzo? Indica prima del cibo la quantità.")
+                                              "Pranzo time! 🍽 Cosa hai mangiato a pranzo?\n ⚠️ Indica prima del cibo la quantità.")
 
                 elif check_time_in_range(current_time_reminder, ORA_CENA_START, ORA_CENA_END):
                     bot_telegram.send_message(user_id,
-                                              "Cena! Cosa hai mangiato a cena? Indica prima del cibo la quantità.")
+                                              "Cena time! 🍽 Cosa hai mangiato a cena?\n ⚠️ Indica prima del cibo la quantità.")
                 self.profile_completed = True
 
             if user_response.startswith('emozione_'):
@@ -506,24 +505,23 @@ class ProfilazioneBot:
             elif user_response.startswith('obiettivo_'):
                 obiettivo_selezionato = user_response[len('obiettivo_'):]
                 self.salva_profilo(user_id, 'obiettivo', obiettivo_selezionato)
-                self.index += 1
                 self.bot_telegram.send_message(user_id,
-                                               "Grazie! Ora il tuo profilo è completo. Chiedimi ciò che desideri😊")
+                                               "Grazie! Profilo completato ✅\n\n Chiedimi ciò che desideri😊")
+                self.index += 1
+                self.profile_completed = True
+
                 if check_time_in_range(current_time_reminder, ORA_COLAZIONE_START, ORA_COLAZIONE_END):
                     bot_telegram.send_message(user_id,
-                                              "Buongiorno! Cosa hai mangiato a colazione? Indica prima del cibo la "
+                                              "Colazione time! 🥛 Cosa hai mangiato a colazione? \n⚠️ Indica prima del cibo la "
                                               "quantità.")
 
                 elif check_time_in_range(current_time_reminder, ORA_PRANZO_START, ORA_PRANZO_END):
                     bot_telegram.send_message(user_id,
-                                              "Pranzo time! Cosa hai mangiato a pranzo? Indica prima del cibo la quantità.")
+                                              "Pranzo time! 🍽 Cosa hai mangiato a pranzo? \n⚠️ Indica prima del cibo la quantità.")
 
                 elif check_time_in_range(current_time_reminder, ORA_CENA_START, ORA_CENA_END):
                     bot_telegram.send_message(user_id,
-                                              "Cena! Cosa hai mangiato a cena? Indica prima del cibo la quantità.")
-                #TODO: Viene gestito un messaggio in più
-
-
+                                              "Cena time! 🍽 Cosa hai mangiato a cena? \n⚠️ Indica prima del cibo la quantità.")
 
 
     def invia_domanda_attuale(self, chat_id):
@@ -542,17 +540,27 @@ class ProfilazioneBot:
     # Aggiungi il gestore del callback per le emozioni
 
     def gestisci_risposta(self, user_id, user_response):
-        if not self.profile_completed and self.index < len(questions_and_fields):
-            question, field = questions_and_fields[self.index]
+        try:
+            if not self.profile_completed and self.index < len(questions_and_fields):
+                question, field = questions_and_fields[self.index]
 
-            # Altrimenti, gestisci la risposta come testo
-            self.user_profile[field] = user_response
+                # Altrimenti, gestisci la risposta come testo
+                self.user_profile[field] = user_response
 
-            # Esegui l'aggiornamento del profilo nel database se necessario
-            self.salva_profilo(user_id, field, user_response)
+                # Esegui l'aggiornamento del profilo nel database se necessario
+                self.salva_profilo(user_id, field, user_response)
 
-            self.index += 1
-            self.invia_domanda_attuale(user_id)
+                self.index += 1
+                self.invia_domanda_attuale(user_id)
+        except Exception as db_error:
+
+            if hasattr(db_error, 'errno') and db_error == errorcode.ER_TRUNCATED_WRONG_VALUE:
+                # Handle the specific error for incorrect integer value
+                self.bot_telegram.send_message(user_id,
+                                               text="⚠️Errore: Valore non valido per il campo 'eta'. Inserisci un numero valido.")
+            else:
+                # Handle other database errors
+                self.bot_telegram.send_message(user_id, text=f"⚠️Hai inserito un valore errato. Riprova")
 
         if self.index == len(questions_and_fields):
             # Gestisci altre logiche dopo che tutte le domande sono state completate
@@ -573,24 +581,8 @@ class ProfilazioneBot:
             # Puoi anche inviare una conferma all'utente se lo desideri
             confirmation_message = f"Grazie! 😊 La tua risposta per <b>{field}</b> è: <b>{value}</b>"
             self.bot_telegram.send_message(chat_id, confirmation_message, parse_mode='HTML', disable_notification=True)
-        #TODO: Inviare i messaggi di errori finchè l'utente inserisce un valore errato
         except IntegrityError as integrity_error:
 
             print(f"Vincolo di integrità violato: {integrity_error}")
 
             self.bot_telegram.send_message(chat_id, text="⚠️ Hai inserito un valore errato. Riprova.")
-
-        except Exception as db_error:
-
-            if hasattr(db_error, 'errno') and db_error == errorcode.ER_TRUNCATED_WRONG_VALUE:
-                # Handle the specific error for incorrect integer value
-                self.bot_telegram.send_message(chat_id,
-                                               text="⚠️Errore: Valore non valido per il campo 'eta'. Inserisci un numero valido.")
-            else:
-                # Handle other database errors
-                self.bot_telegram.send_message(chat_id, text=f"⚠️Hai inserito un valore errato. Riprova")
-        finally:
-            if mysql_cursor:
-                mysql_cursor.close()
-            if mysql_connection:
-                mysql_connection.close()

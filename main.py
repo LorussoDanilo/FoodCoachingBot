@@ -15,7 +15,6 @@ from queue import Queue
 
 import matplotlib.pyplot as plt
 import pandas as pd
-import self
 from PIL import Image
 from dotenv import load_dotenv
 from mysql.connector import IntegrityError, errorcode
@@ -27,7 +26,7 @@ from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 from src.chatGPT_response import write_chatgpt, write_chatgpt_for_dieta_info
 from src.connection import connect, connect_mysql
-from src.controls import check_time_in_range, split_chunks
+from src.controls import check_time_in_range, split_chunks, control_tag
 from src.handle_reminder_data import save_user_food_response, send_week_reminder_message
 from src.handle_user_data import get_user_profile, create_new_user, ask_next_question, get_all_telegram_ids, \
     voice_recognizer, clear_audio, photo_recognizer, get_dieta_settimanale_ids, \
@@ -154,6 +153,7 @@ START_COMMAND = 'start'
 EDIT_COMMAND = 'modifica'
 PROFILO_COMMAND = 'profilo'
 REPORT_COMMAND = 'report'
+INFO_COMMAND = 'info'
 
 # Periodo giorno
 meal_type = None
@@ -247,6 +247,7 @@ if __name__ == '__main__':
         telegram_id = message.chat.id
         user_profile = get_user_profile(telegram_id)
         dieta_settimanale_ids = get_dieta_settimanale_ids(telegram_id)
+        bot_telegram.send_message(telegram_id, "Sto generando il report...📄")
 
         for ds_id in dieta_settimanale_ids:
             # Query per ottenere i dati
@@ -409,6 +410,21 @@ if __name__ == '__main__':
                 if os.path.exists(image_file):
                     os.remove(image_file)
 
+    # metodo per gestire il comando /profilo per visualizzare i dati del profilo
+    @bot_telegram.message_handler(commands=[INFO_COMMAND])
+    def show_info_bot(message):
+        """
+        Questa funzione serve per visualizzare le info sulle funzionalità del bot
+        :type message: Message
+        :return: messaggio di info
+        :rtype: Message
+        """
+        telegram_id = message.chat.id
+        msg = control_tag(root, "./telegram/informazioni", INFO_COMMAND, "spiegazioni")
+        bot_telegram.send_message(telegram_id, msg.replace('{nome}', message.chat.first_name))
+
+
+
 
     # metodo per gestire il comando /profilo per visualizzare i dati del profilo
     @bot_telegram.message_handler(commands=[PROFILO_COMMAND])
@@ -460,10 +476,10 @@ if __name__ == '__main__':
             create_new_user(mysql_cursor, mysql_connection)
 
         # Invia il messaggio iniziale
-        bot_telegram.send_message(telegram_id, message.chat.username + " " + "modifica i dati del tuo profilo!")
+        bot_telegram.send_message(telegram_id, message.chat.username + " " + "modifica i dati del tuo profilo! ✍️")
 
         # Inizia a fare domande per l'aggiornamento delle informazioni
-        # ask_next_question(telegram_id, bot_telegram, questions_and_fields, index_edit)
+        ask_next_question(telegram_id, bot_telegram, index_edit)
 
         reminder_message_thread = threading.Thread(target=send_reminder_message, daemon=True, args=(
             event, bot_telegram, ORA_COLAZIONE_START, ORA_COLAZIONE_END, ORA_PRANZO_START, ORA_PRANZO_END,
@@ -506,17 +522,16 @@ if __name__ == '__main__':
                  InlineKeyboardButton("No", callback_data='consenso_no')]
             ])
             consenso_message = (
-                "Prima di cominciare con le domande di profilazione, dobbiamo ottenere il tuo consenso per "
-                "l'uso dei dati. Acconsenti?")
+                "⚠️ Prima di cominciare con le domande di profilazione, dobbiamo ottenere il tuo consenso per "
+                "l'uso dei dati.\n\n Ti ricordo che la profilazione mi renderà più efficiente 🤖.\n\n Acconsenti?")
             bot_telegram.send_message(telegram_id, consenso_message, reply_markup=reply_markup_consenso)
             start_command_used = True
         else:
             bot_telegram.send_message(message.chat.id,
-                                      "Il comando di start è stato già utilizzato. Chiedimi ciò che desideri😊")
+                                      "⚠️ Il comando di start è stato già utilizzato.\n\n Chiedimi ciò che desideri😊")
 
 
     # Gestisci altri possibili callback_data
-
     @bot_telegram.message_handler(func=lambda message: True, content_types=['text', 'voice', 'photo'])
     def handle_profile_response(message):
         """
@@ -626,16 +641,16 @@ if __name__ == '__main__':
         except IntegrityError as integrity_error:
             print(f"Vincolo di integrità violato: {integrity_error}")
             telegram_id = message.chat.id
-            bot_telegram.send_message(telegram_id, "Hai inserito un valore errato. Riprova.")
+            bot_telegram.send_message(telegram_id, "⚠️ Hai inserito un valore errato. Riprova.")
 
         except mysql_cursor.Error as db_error:
             if db_error.errno == errorcode.ER_TRUNCATED_WRONG_VALUE:
                 # Handle the specific error for incorrect integer value
                 bot_telegram.send_message(telegram_id,
-                                          "Errore: Valore non valido per il campo 'eta'. Inserisci un numero valido.")
+                                          " ⚠️ Errore: Valore non valido per il campo 'eta'. Inserisci un numero valido.")
             else:
                 # Handle other database errors
-                bot_telegram.send_message(telegram_id, f"Errore del database: {db_error}")
+                bot_telegram.send_message(telegram_id, f"⚠️ Errore del database: {db_error}")
 
 
 @bot_telegram.message_handler(func=lambda message: True, content_types=['text', 'voice', 'photo'])
@@ -899,20 +914,20 @@ def send_reminder_message(event, bot_telegram, ORA_COLAZIONE_START, ORA_COLAZION
         for telegram_id in telegram_ids:
             if check_time_in_range(current_time_reminder, ORA_COLAZIONE_START, ORA_COLAZIONE_END):
                 bot_telegram.send_message(telegram_id,
-                                          "Buongiorno! Cosa hai mangiato a colazione? Indica prima del cibo la "
-                                          "quantità.",
+                                          "Colazione time! 🥛 Cosa hai mangiato a colazione? \n⚠️ Indica prima del cibo "
+                                          "la quantità.",
                                           trem.sleep(40))
                 event_send_reminder.clear()  # Disattiva l'evento per inviare il reminder
 
             elif check_time_in_range(current_time_reminder, ORA_PRANZO_START, ORA_PRANZO_END):
                 bot_telegram.send_message(telegram_id,
-                                          "Pranzo time! Cosa hai mangiato a pranzo? Indica prima del cibo la quantità.",
+                                          "Pranzo time! 🍽 Cosa hai mangiato a pranzo? \n⚠️ Indica prima del cibo la quantità.",
                                           trem.sleep(40))
                 event_send_reminder.clear()  # Disattiva l'evento per inviare il reminder
 
             elif check_time_in_range(current_time_reminder, ORA_CENA_START, ORA_CENA_END):
                 bot_telegram.send_message(telegram_id,
-                                          "Cena! Cosa hai mangiato a cena? Indica prima del cibo la quantità.",
+                                          "Cena time! 🍽 Cosa hai mangiato a cena? \n⚠️ Indica prima del cibo la quantità.",
                                           trem.sleep(40))
             else:
                 event.clear()
