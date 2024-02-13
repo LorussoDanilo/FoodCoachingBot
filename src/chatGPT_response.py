@@ -159,6 +159,15 @@ def write_chatgpt_for_dieta_info(openai, profilo_utente, mysql_cursor, telegram_
         stile_vita = profilo_utente.get('stile_vita')
         obiettivo = profilo_utente.get('obiettivo')
 
+        # Verifica se 'malattie' è una lista o meno
+        eta = str(eta) if eta is not None else "Non definito"
+        malattie = ", ".join(map(str, malattie)) if malattie and isinstance(malattie, list) else "Non definito"
+        emozione = str(emozione) if emozione is not None else "Non definito"
+        peso = str(peso) if peso is not None else "Non definito"
+        altezza = str(altezza) if altezza is not None else "Non definito"
+        stile_vita = str(stile_vita) if stile_vita is not None else "Non definito"
+        obiettivo = str(obiettivo) if obiettivo is not None else "Non definito"
+
         dieta_settimanale_info = get_dieta_settimanale_info(mysql_cursor, telegram_id)
 
         if dieta_settimanale_info:

@@ -358,7 +358,7 @@ if __name__ == '__main__':
 
             # Impostazioni della pagina
             page_width, page_height = letter
-            start_x = 60  # Puoi regolare questa posizione x di partenza
+            start_x = 70  # Puoi regolare questa posizione x di partenza
             max_width = page_width - start_x
 
             # Aggiungi le immagini al PDF
@@ -522,7 +522,7 @@ if __name__ == '__main__':
                  InlineKeyboardButton("No", callback_data='consenso_no')]
             ])
             consenso_message = (
-                "⚠️ Prima di cominciare con le domande di profilazione, dobbiamo ottenere il tuo consenso per "
+                f"Ciao {username}! 😁\n\n⚠️ Prima di cominciare con le domande di profilazione, dobbiamo ottenere il tuo consenso per "
                 "l'uso dei dati.\n\n Ti ricordo che la profilazione mi renderà più efficiente 🤖.\n\n Acconsenti?")
             bot_telegram.send_message(telegram_id, consenso_message, reply_markup=reply_markup_consenso)
             start_command_used = True
