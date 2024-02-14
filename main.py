@@ -28,7 +28,7 @@ from src.chatGPT_response import write_chatgpt, write_chatgpt_for_dieta_info
 from src.connection import connect, connect_mysql
 from src.controls import check_time_in_range, split_chunks, control_tag
 from src.handle_reminder_data import save_user_food_response, send_week_reminder_message
-from src.handle_user_data import get_user_profile, create_new_user, ask_next_question, get_all_telegram_ids, \
+from src.handle_user_data import get_user_profile, create_new_user, get_all_telegram_ids, \
     voice_recognizer, clear_audio, photo_recognizer, get_dieta_settimanale_ids, \
     get_dieta_settimanale_profile, ProfilazioneBot
 
@@ -230,6 +230,16 @@ reply_markup_obiettivo = InlineKeyboardMarkup([
     # Aggiungi altri pulsanti per diverse emozioni
 ])
 
+reply_markup_consenso = InlineKeyboardMarkup([
+    [InlineKeyboardButton("Si", callback_data='consenso_si'),
+     InlineKeyboardButton("No", callback_data='consenso_no')]
+])
+
+reply_markup_confirmation = InlineKeyboardMarkup([
+    [InlineKeyboardButton("Si", callback_data='cancella_si'),
+     InlineKeyboardButton("No", callback_data='cancella_no')]
+])
+
 if __name__ == '__main__':
 
     @bot_telegram.message_handler(commands=[REPORT_COMMAND])
@@ -410,6 +420,7 @@ if __name__ == '__main__':
                 if os.path.exists(image_file):
                     os.remove(image_file)
 
+
     # metodo per gestire il comando /profilo per visualizzare i dati del profilo
     @bot_telegram.message_handler(commands=[INFO_COMMAND])
     def show_info_bot(message):
@@ -422,8 +433,6 @@ if __name__ == '__main__':
         telegram_id = message.chat.id
         msg = control_tag(root, "./telegram/informazioni", INFO_COMMAND, "spiegazioni")
         bot_telegram.send_message(telegram_id, msg.replace('{nome}', message.chat.first_name))
-
-
 
 
     # metodo per gestire il comando /profilo per visualizzare i dati del profilo
@@ -468,23 +477,55 @@ if __name__ == '__main__':
         :return: domande per l'aggiornamento dei dati del profilo
         :rtype: Message
         """
-
         telegram_id = message.chat.id
-        index_edit = 0
         user_profile_edit = get_user_profile(telegram_id)
-        if not user_profile_edit:
-            create_new_user(mysql_cursor, mysql_connection)
+        user_response = message.text
 
-        # Invia il messaggio iniziale
-        bot_telegram.send_message(telegram_id, message.chat.username + " " + "modifica i dati del tuo profilo! ✍️")
+        print(user_response)
 
-        # Inizia a fare domande per l'aggiornamento delle informazioni
-        ask_next_question(telegram_id, bot_telegram, index_edit)
+        username = user_profile_edit.get('nome_utente')
+        eta = user_profile_edit.get('eta')
+        malattie = user_profile_edit.get('malattie')
+        emozione = user_profile_edit.get('emozione')
+        peso = user_profile_edit.get('peso')
+        altezza = user_profile_edit.get('altezza')
+        stile_vita = user_profile_edit.get('stile_vita')
+        obiettivo = user_profile_edit.get('obiettivo')
 
-        reminder_message_thread = threading.Thread(target=send_reminder_message, daemon=True, args=(
-            event, bot_telegram, ORA_COLAZIONE_START, ORA_COLAZIONE_END, ORA_PRANZO_START, ORA_PRANZO_END,
-            ORA_CENA_START, ORA_CENA_END,))
-        reminder_message_thread.start()
+        # Azzero l'indice e setto la variabile profile_completed per cominciare la sequenza di domande
+        profilazione_bot.profile_completed = False
+        profilazione_bot.index = 0
+
+        if not eta or not malattie or not emozione or not peso or not altezza or not stile_vita or not obiettivo:
+            consenso_message = (
+                f"Ciao {username}! 😁\n\n⚠️ Per aggiornare i dati del profilo, dobbiamo ottenere il tuo consenso per "
+                "l'uso dei dati.\n\n Ti ricordo che i dati del tuo profilo renderanno le mie risposte più efficienti "
+                "🤖.\n\n Acconsenti?")
+            bot_telegram.send_message(telegram_id, consenso_message, reply_markup=reply_markup_consenso)
+
+        else:
+            # Invia il messaggio iniziale
+            # Verifica se il testo del messaggio è uguale al comando /modifica
+            if user_response != f'/{EDIT_COMMAND}':
+
+                profilazione_bot.gestisci_risposta(telegram_id, user_response)
+            else:
+                # Gestisci il caso in cui l'utente abbia inviato solo il comando /modifica
+                bot_telegram.send_message(telegram_id,
+                                          message.chat.username + " " + "modifica i dati del tuo profilo! ✍️")
+                question, field = profilazione_bot.questions_and_fields[0]
+                bot_telegram.send_message(telegram_id, text=question)
+
+
+    # Metodo per gestire il comando /cancella
+    @bot_telegram.message_handler(commands=['cancella'])
+    def delete_profile_data(message):
+        telegram_id = message.chat.id
+
+        # Chiedi conferma all'utente prima di cancellare i dati
+        confirmation_message = "Sei sicuro di voler cancellare i dati del profilo? Questa azione non può essere annullata."
+
+        bot_telegram.send_message(telegram_id, confirmation_message, reply_markup=reply_markup_confirmation)
 
 
     # Metodo per gestire il comando /start
@@ -516,16 +557,13 @@ if __name__ == '__main__':
                 # Se l'utente non esiste viene creato inserendo l'id telegram e il suo username
                 create_new_user(telegram_id, username)
 
-            # Inizia chiedendo il consenso ai dati
-            reply_markup_consenso = InlineKeyboardMarkup([
-                [InlineKeyboardButton("Si", callback_data='consenso_si'),
-                 InlineKeyboardButton("No", callback_data='consenso_no')]
-            ])
             consenso_message = (
                 f"Ciao {username}! 😁\n\n⚠️ Prima di cominciare con le domande di profilazione, dobbiamo ottenere il tuo consenso per "
-                "l'uso dei dati.\n\n Ti ricordo che la profilazione mi renderà più efficiente 🤖.\n\n Acconsenti?")
+                "l'uso dei dati.\n\n Ti ricordo che conoscendo i dati del tuo profilo le mie risposte saranno più efficienti 🤖.\n\n Acconsenti?")
             bot_telegram.send_message(telegram_id, consenso_message, reply_markup=reply_markup_consenso)
             start_command_used = True
+
+
         else:
             bot_telegram.send_message(message.chat.id,
                                       "⚠️ Il comando di start è stato già utilizzato.\n\n Chiedimi ciò che desideri😊")
@@ -557,11 +595,13 @@ if __name__ == '__main__':
                 # Aggiungi un input per simulare la risposta dell'utente
                 profilazione_bot.gestisci_risposta(telegram_id, user_response)
             else:
+
                 if event.is_set():
                     event_send_reminder.set()
                     reminder_message_thread = threading.Thread(target=send_reminder_message, daemon=True, args=(
                         event, bot_telegram, ORA_COLAZIONE_START, ORA_COLAZIONE_END, ORA_PRANZO_START, ORA_PRANZO_END,
                         ORA_CENA_START, ORA_CENA_END,))
+
                     reminder_message_thread.start()
 
                     reminder_thread = threading.Thread(target=handle_reminder_response, daemon=True, args=(message,))
@@ -604,7 +644,7 @@ if __name__ == '__main__':
                                                    ORA_COLAZIONE_END) or check_time_in_range(current_time_reminder,
                                                                                              ORA_PRANZO_START,
                                                                                              ORA_PRANZO_END) or check_time_in_range(
-                                current_time_reminder, ORA_CENA_START, ORA_CENA_END):
+                            current_time_reminder, ORA_CENA_START, ORA_CENA_END):
                             if message.content_type == 'text':
 
                                 user_profile = get_user_profile(telegram_id)
@@ -612,6 +652,7 @@ if __name__ == '__main__':
 
                                 response_chunks = write_chatgpt(bot_telegram, openai, user_response, user_profile,
                                                                 mysql_cursor, telegram_id)
+                                print(response_chunks)
 
                                 if response_chunks == frase_is_food:
                                     bot_telegram.send_message(telegram_id, frase_is_food)
@@ -619,13 +660,15 @@ if __name__ == '__main__':
 
                                     # Invia ciascun elemento della lista ogni 5 secondi
                                     for chunk in response_chunks:
-                                        # Suddividi il chunk in pezzi da 400 parole
+                                        # Split based on words, not characters
                                         splitted = split_chunks(chunk)
 
-                                        # Invia ciascun pezzo ogni 5 secondi
+                                        # Send a message every 400 words
                                         for split_chunk in splitted:
-                                            split_chunk += "..."
-                                            bot_telegram.send_message(telegram_id, split_chunk, trem.sleep(8))
+                                            bot_telegram.send_message(telegram_id, split_chunk + "...")
+                                            # Sleep for 8 seconds after sending each chunk
+                                            trem.sleep(8)
+
 
                             elif message.content_type == 'voice':
                                 voice_handler(message)
@@ -693,12 +736,12 @@ def handle_reminder_response(message):
                     with open('audio.ogg', 'wb') as file:
                         file.write(download_file)
 
-                    text = voice_recognizer()
+                    text = voice_recognizer(openai)
                     save_user_food_response(bot_telegram, mysql_cursor, mysql_connection, telegram_id, meal_type,
                                             text, app_id, app_key)
                     clear_audio()
                 elif message.content_type == 'photo':
-                    text = photo_recognizer(message, bot_telegram)
+                    text = photo_recognizer(message, bot_telegram,openai)
                     save_user_food_response(bot_telegram, mysql_cursor, mysql_connection, telegram_id, meal_type,
                                             text, app_id, app_key)
 
@@ -720,12 +763,12 @@ def handle_reminder_response(message):
                     with open('audio.ogg', 'wb') as file:
                         file.write(download_file)
 
-                    text = voice_recognizer()
+                    text = voice_recognizer(openai)
                     save_user_food_response(bot_telegram, mysql_cursor, mysql_connection, telegram_id, meal_type,
                                             text, app_id, app_key)
                     clear_audio()
                 elif message.content_type == 'photo':
-                    text = photo_recognizer(message, bot_telegram)
+                    text = photo_recognizer(message, bot_telegram,openai)
                     save_user_food_response(bot_telegram, mysql_cursor, mysql_connection, telegram_id, meal_type,
                                             text, app_id, app_key)
                 event.clear()
@@ -748,13 +791,13 @@ def handle_reminder_response(message):
                     with open('audio.ogg', 'wb') as file:
                         file.write(download_file)
 
-                    text = voice_recognizer()
+                    text = voice_recognizer(openai)
                     print(text)
                     save_user_food_response(bot_telegram, mysql_cursor, mysql_connection, telegram_id, meal_type,
                                             text, app_id, app_key)
                     clear_audio()
                 elif message.content_type == 'photo':
-                    text = photo_recognizer(message, bot_telegram)
+                    text = photo_recognizer(message, bot_telegram,openai)
                     save_user_food_response(bot_telegram, mysql_cursor, mysql_connection, telegram_id, meal_type,
                                             text, app_id, app_key)
 
@@ -795,7 +838,7 @@ def voice_handler(message):
             file.write(download_file)
 
         # chiamare la funzione che permette di riconoscere la voce e convertire il file .ogg in .wav
-        text = voice_recognizer()
+        text = voice_recognizer(openai)
         print(text)
 
         user_profile = get_user_profile(telegram_id)
@@ -834,7 +877,7 @@ def photo_handler(message):
     telegram_id = message.chat.id
     # Esegui il riconoscimento del cibo
 
-    photo_result = photo_recognizer(message, bot_telegram)
+    photo_result = photo_recognizer(message, bot_telegram,openai)
     if message.caption:
         results = photo_result + message.caption
         user_profile = get_user_profile(telegram_id)

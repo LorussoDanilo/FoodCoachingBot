@@ -8,10 +8,11 @@ locale.setlocale(locale.LC_TIME, 'it_IT')
 
 def split_chunks(chunk, max_words=400):
     words = chunk.split()
-    chunks = [words[i:i + max_words] for i in range(0, len(words), max_words)]
-    return [' '.join(chunk) for chunk in chunks]
+    chunks = [' '.join(words[i:i + max_words]) for i in range(0, len(words), max_words)]
+    return chunks
+
+
 def count_words(text):
-    # Conta il numero di parole nel testo
     words = text.split()
     return len(words)
 

@@ -5,19 +5,19 @@ testuali e foto
     Danilo Lorusso - Version 1.0
 """
 
+import io
 import locale
 import logging
 import os
 import subprocess
 import tempfile
-import traceback
 from datetime import datetime, time
 from sqlite3 import IntegrityError
 
 import requests
 import speech_recognition as sr
 from mysql.connector import errorcode
-from roboflow import Roboflow
+from pydub import AudioSegment
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 from src.connection import connect_mysql
@@ -40,7 +40,6 @@ logging.basicConfig(
 # inizializzazione della variabile usata per riempire il file di logger
 logger = logging.getLogger('telegram-bot')
 logging.getLogger('urllib3.connectionpool').setLevel('INFO')
-
 
 # Inizializzazione degli intervalli orari per inviare i reminder
 ORA_COLAZIONE_START = time(8, 0)
@@ -126,37 +125,28 @@ def create_new_user(telegram_id, username):
         print(f"Error creating new user: {e}")
 
 
-def update_user_profile(field_name, user_profile, response):
+def delete_user_profile(telegram_id):
     """
-        Questa funzione permette di aggiornare i campi della tabella utenti del database. Usato per il comando /modifica
-        per avviare la modifica dei dati del profilo utente
+        Questa funzione permette di revocare il consenso al trattamento dei dati cancellando i dati del profilo
 
         :param field_name: campo della tabella utenti
         :type field_name: str
         :param user_profile: dizionario che contiene i dati del profilo utente
         :type user_profile: dict
-        :param response: messaggio di risposta dell'utente per la modifica dei dati
-        :type user_profile: dict
 
-        :return: la query che aggiorna i dati del profilo dell'utente nella tabella utenti
+        :return: la query che cancella i dati del profilo dell'utente nella tabella utenti
         :rtype: None
     """
+    fields_to_delete = ['eta', 'malattie', 'emozione', 'peso', 'altezza', 'stile_vita', 'obiettivo']
+    delete_query = f"UPDATE utenti SET {', '.join(f'{field} = NULL' for field in fields_to_delete)} WHERE telegram_id = %s"
 
-    # Definisci le associazioni tra le parole chiave della risposta e i campi del profilo utente
-    update_profile_fields = {
-        'telegram_id': 'telegram_id',
-        'nome_utente': '{nome}',
-        'eta': 'eta',
-        'malattie': 'malattie',
-        'emozione': 'emozione'
-        # Aggiungi gli altri campi del profilo utente
-    }
+    # Esegui la query SQL
+    mysql_cursor.execute(delete_query, (telegram_id,))
 
-    # Estrai il campo corrispondente dalla risposta
-    db_field = update_profile_fields.get(field_name.lower())
-    if db_field and response:
-        user_profile[db_field] = response
-    print(response)
+    # Conferma e chiudi la connessione al database
+    mysql_connection.commit()
+
+
 
 
 def get_user_profile(telegram_id):
@@ -257,86 +247,7 @@ def get_all_telegram_ids():
     return [row[0] for row in result]
 
 
-# Update data Funzione per fare domande per l'aggiornamento delle informazioni
-def ask_next_question(telegram_id, bot, index):
-    """
-    Questa funzione permette di fare le domande di profilazione all'utente
-
-    :param telegram_id: id telegram dell'utente
-    :type telegram_id: int
-    :param bot: permette di usare i metodi della libreria Telebot
-    :type bot: Telebot
-    :param index: indice della domanda che viene fatta all'utente che viene incrementato ciclicamente
-    :type index: int
-
-
-    :return: la domanda da fare all'utente
-    :rtype: Message
-    """
-    if index < len(questions_and_fields):
-        question, field = questions_and_fields[index]
-        bot.send_message(telegram_id, question)
-        # Registra la funzione di gestione della risposta
-        bot.register_next_step_handler_by_chat_id(telegram_id, lambda m: handle_update_response(m, telegram_id, bot,
-                                                                                                questions_and_fields,
-                                                                                                index))
-    else:
-        # Se tutte le domande sono state fatte, comunica all'utente che i dati sono stati aggiornati
-        bot.send_message(telegram_id,
-                         "I tuoi dati sono stati aggiornati con successo! Puoi chiedermi ciò che desideri 😊")
-
-    # Funzione per gestire la risposta dell'utente
-    def handle_update_response(message, telegram_id_update, bot_update, questions_and_fields_update, index_update):
-        """
-            Questa funzione permette di salvare le risposte dell'utente nel database aggiornando cosi i dati dell'utente
-
-            :param message: messaggio dell'utente
-            :type message: Message
-            :param telegram_id_update: id telegram dell'utente
-            :type telegram_id_update: int
-            :param bot_update: permette di usare i metodi della libreria Telebot
-            :type bot_update: Telebot
-            :param questions_and_fields_update: lista che contiene le domande e i campi della tabella utenti a cui
-                    si riferiscono
-            :type questions_and_fields_update: list
-            :param index_update: indice della domanda che viene fatta all'utente che viene incrementato ciclicamente
-            :type index_update: int
-
-            :return: la query di aggiornamento dei dati utilizzata in ask_next_question
-            :rtype: None
-        """
-
-        try:
-            user_response = str(message.text)
-            telegram_user_id = message.chat.id
-            # Check if the user exists in the database
-
-            # Connessione a MySQL e ottenimento di un cursore
-            mysql_connection, cursor = connect_mysql()
-
-            # Esecuzione della query per aggiornare il profilo dell'utente nel database
-            update_query = (f"UPDATE utenti SET {questions_and_fields_update[index_update][1]} = %s WHERE telegram_id "
-                            f"= %s")
-            cursor.execute(update_query, (user_response, telegram_user_id))
-
-            # Commit delle modifiche al database
-            mysql_connection.commit()
-
-            # Invio di un messaggio di conferma all'utente
-            confirmation_message = f"{questions_and_fields_update[index_update][1]} aggiornato/a: {user_response}"
-            bot_update.send_message(telegram_user_id, confirmation_message)
-
-            # Chiudi la connessione al database
-            mysql_connection.close()
-
-            # Passa alla prossima domanda se ci sono ancora domande
-            ask_next_question(telegram_id_update, bot_update, index_update + 1)
-
-        except Exception as e:
-            print(f"Errore durante la gestione della risposta: {e}")
-
-
-def voice_recognizer():
+def voice_recognizer(openai):
     """
     Questa funzione permette di processare l'audio convertendolo, attraverso un programma esterno da scaricare,
     l'audio di telegram dal formato .ogg al formato .wav. Viene salvato temporaneamente il file audio, riconosciuto
@@ -345,10 +256,8 @@ def voice_recognizer():
     :return: il testo riconosciuto dal vocale
     :rtype: str
     """
-
     ffmpeg_path = os.getenv('FFMPEG_PATH')
-    # inizializzazione della variabile usata per riconoscere la lingua dei messaggi vocali
-    language = os.getenv('VOICE_RECOGNIZER_LANGUAGE')
+
     recognizer = sr.Recognizer()
     # convertire un file audio da formato OGG a formato WAV
     subprocess.run([ffmpeg_path, '-i', 'audio.ogg', 'audio.wav', '-y'])
@@ -356,28 +265,30 @@ def voice_recognizer():
     audio_file_path = 'audio.wav'
 
     with sr.AudioFile(audio_file_path) as file:
-        audio = recognizer.record(file)
-
-    # Set up the SpeechRecognition recognizer
+        recognizer.record(file)
     try:
-        # recognizer_google
-        text = recognizer.recognize_google_cloud(audio, os.getenv('GOOGLE_APPLICATION_CREDENTIALS'), language=language)
-        print(text + ' recognizer')
+        # Carica il file audio
+        audio = AudioSegment.from_file(audio_file_path, format="wav")
+        # Utilizza solo i primi 10 secondi
+        audio = audio[:10000]
+        # Esporta l'audio in formato WAV in un buffer di byte
+        buffer = io.BytesIO()
+        buffer.name = 'audio.wav'
+        audio.export(buffer, format="wav")
 
-    except sr.UnknownValueError:
-        logger.warning("Google Cloud Speech Recognition could not understand the audio.")
-        text = 'Parole non riconosciute Unkonown.'
+        # recognizer_openai_whisper
+        response = openai.Audio.transcribe("whisper-1", buffer)
 
-    except sr.RequestError as e:
-        logger.error(f"Google Cloud Speech Recognition request failed; {e}")
-        text = 'Parole non riconosciute. Request failed'
-
+        # Gestisci correttamente la risposta
+        if 'text' in response:
+            text = response['text']
+            return text
+        else:
+            print("Risposta inattesa da OpenAI:", response)
+            return "Parole non riconosciute. General_exception"
     except Exception as e:
-        logger.error(f"Exception:\n{traceback.format_exc()}")
-        print(f"Exception: {e}")
-        text = 'Parole non riconosciute. General_exception'
-
-    return text
+        print("Errore durante il riconoscimento vocale:", e)
+        return "Parole non riconosciute. General_exception"
 
 
 # Metodo per cancellare i file .ogg e .wav generati
@@ -396,7 +307,7 @@ def clear_audio():
             os.remove(_file)
 
 
-def photo_recognizer(message, bot_telegram):
+def photo_recognizer(message, bot_telegram, openai):
     """
     Questa funzione permette di riconoscere le foto inviate dall'utente e ritornare il testo
     che rappresenta il risultato del riconoscimento della foto
@@ -427,19 +338,24 @@ def photo_recognizer(message, bot_telegram):
             temp_file.write(requests.get(image_url).content)
             temp_file.close()  # Chiudi il file dopo aver scritto
 
-            rf = Roboflow(api_key="DdgoW5JHoOafvCdYGtUE")
-            project = rf.workspace().project("merge-wrowm")
-            model = project.version(2).model
-            result = model.predict(temp_file.name, confidence=40, overlap=30)
+            # Utilizza OpenAI Vision per analizzare l'immagine
+            result = openai.Image.create(model="image-alpha-001", file=temp_file)
+            # Estrai informazioni dall'output di OpenAI Vision
+            image_description = result['data'][0]['description']
+            prompt = f"Scrivimi che cibo è {image_description}\nScrivi solo il nome del cibo e nient'altro?"
+            print(prompt)
+
+            chatgpt_response = openai.Completion.create(
+                model="text-davinci-003",
+                messages=[
+                    {"role": "system", "content": "You are a helpful assistant."},
+                    {"role": "user", "content": prompt},
+                ],
+            )
             # Esegui l'inferenza utilizzando il percorso temporaneo del file
             if result:
-                print(result.json())
-                # Rimuovi il file temporaneo
-                os.remove(temp_file.name)
-                predictions = result.json().get("predictions", [])
-                recognized_class = predictions[0]["class"]
-                print(recognized_class)
-                return recognized_class
+
+                return chatgpt_response
             else:
                 os.remove(temp_file.name)
                 return bot_telegram.send_message(telegram_id, "Foto non riconosciuta. Riprovare!")
@@ -447,8 +363,6 @@ def photo_recognizer(message, bot_telegram):
     except Exception as e:
         print(f"Error in photo_recognizer: {e}")
         bot_telegram.reply_to(message, "Si è verificato un errore durante il riconoscimento dell'immagine.")
-
-
 
 
 class ProfilazioneBot:
@@ -469,6 +383,17 @@ class ProfilazioneBot:
             user_response = call.data
             current_time_reminder = datetime.now().time()
             print(self.index)
+
+            if call.data == 'cancella_si':
+                # Esegui l'aggiornamento nel database per cancellare i dati del profilo
+                delete_user_profile(user_id)
+                # Invia un messaggio di conferma
+                bot_telegram.send_message(user_id, "I dati del profilo sono stati cancellati.")
+
+            elif call.data == 'cancella_no':
+                # L'utente ha scelto di non cancellare i dati
+                bot_telegram.send_message(user_id, "Hai scelto di non cancellare i dati del profilo.")
+
             if user_response == 'consenso_si':
                 # Utente ha acconsentito, puoi iniziare con le domande di profilazione
                 bot_telegram.send_message(user_id, "Ottimo! Cominciamo con le domande di profilazione 👤")
@@ -477,19 +402,7 @@ class ProfilazioneBot:
                 # Utente ha rifiutato, puoi gestire di conseguenza
                 bot_telegram.send_message(user_id,
                                           "Puoi utilizzare il bot, ma non acconsentendo alla profilazione, "
-                                          "risulterà meno efficiente😢")
-                if check_time_in_range(current_time_reminder, ORA_COLAZIONE_START, ORA_COLAZIONE_END):
-                    bot_telegram.send_message(user_id,
-                                              "Colazione time! 🥛 Cosa hai mangiato a colazione? \n⚠️ Indica prima del cibo la "
-                                              "quantità.")
-
-                elif check_time_in_range(current_time_reminder, ORA_PRANZO_START, ORA_PRANZO_END):
-                    bot_telegram.send_message(user_id,
-                                              "Pranzo time! 🍽 Cosa hai mangiato a pranzo?\n ⚠️ Indica prima del cibo la quantità.")
-
-                elif check_time_in_range(current_time_reminder, ORA_CENA_START, ORA_CENA_END):
-                    bot_telegram.send_message(user_id,
-                                              "Cena time! 🍽 Cosa hai mangiato a cena?\n ⚠️ Indica prima del cibo la quantità.")
+                                          "le mie risposte risulteranno meno efficienti😢")
                 self.profile_completed = True
 
             if user_response.startswith('emozione_'):
@@ -512,8 +425,8 @@ class ProfilazioneBot:
 
                 if check_time_in_range(current_time_reminder, ORA_COLAZIONE_START, ORA_COLAZIONE_END):
                     bot_telegram.send_message(user_id,
-                                              "Colazione time! 🥛 Cosa hai mangiato a colazione? \n⚠️ Indica prima del cibo la "
-                                              "quantità.")
+                                              "Colazione time! 🥛 Cosa hai mangiato a colazione? \n⚠️ Indica prima del cibo "
+                                              "la quantità.")
 
                 elif check_time_in_range(current_time_reminder, ORA_PRANZO_START, ORA_PRANZO_END):
                     bot_telegram.send_message(user_id,
@@ -522,6 +435,8 @@ class ProfilazioneBot:
                 elif check_time_in_range(current_time_reminder, ORA_CENA_START, ORA_CENA_END):
                     bot_telegram.send_message(user_id,
                                               "Cena time! 🍽 Cosa hai mangiato a cena? \n⚠️ Indica prima del cibo la quantità.")
+
+
 
 
     def invia_domanda_attuale(self, chat_id):

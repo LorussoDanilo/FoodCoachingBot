@@ -62,8 +62,7 @@ def write_chatgpt(bot_telegram, openai, message, profilo_utente, mysql_cursor, t
                 f"La mia età è: {eta} | La mia malattia o disturbo è: {', '.join(malattie)} | Io quando mangio o penso al "
                 f"cibo provo un sentimento: {emozione}"f" | Il mio peso è: {peso} kg| La mia altezza è: {altezza} cm| Il mio stile di vita è: {stile_vita}"
                 f"| L'obiettivo per il quale ti sto chiedendo supporto: {obiettivo}  {dieta_settimanale_text}"
-                f" | Devi scrivere che sei un'intelligenza artificiale. Mettiti nei panni di un nutrizionista ma non dire che ti stai mettendo"
-                f" nei panni di un nutrizionista e "
+                f" | Devi scrivere che sei un'intelligenza artificiale."
                 f"tieni conto della mia età, delle mie malattie o disturbi, "
                 f"l'emozione che provo quando mangio o penso al cibo, al mio peso, alla mia altezza, al mio stile di vita e "
                 f"l'obiettivo per il quale ti sto chiedendo supporto"
@@ -75,10 +74,9 @@ def write_chatgpt(bot_telegram, openai, message, profilo_utente, mysql_cursor, t
             )
         if not eta and not malattie and not emozione:
             input_con_profilo_e_dieta = (
-                f"Devi scrivere che sei un'intelligenza artificiale. Considera che gli alimenti della mia dieta sono stati:{dieta_settimanale_text}"
-                f" | Mettiti nei panni di un nutrizionista e non scrivere che ti stai mettendo nei panni di un "
-                f"nutrizionista"
-                f" e tieni conto della mia dieta settimanale considerando anche"
+                f"Devi scrivere che sei un'intelligenza artificiale. Considera che gli alimenti della mia dieta sono "
+                f"stati:{dieta_settimanale_text}"
+                f" | tieni conto della mia dieta settimanale considerando anche"
                 f" i valori nutrizionali dei cibi"
                 f"prima di rispondere alla seguente domanda:"
                 f" |\n{message_text}"
@@ -91,7 +89,8 @@ def write_chatgpt(bot_telegram, openai, message, profilo_utente, mysql_cursor, t
             response = openai.ChatCompletion.create(
                 model="gpt-3.5-turbo",
                 messages=[
-                    {"role": "user", "content": input_con_profilo_e_dieta}
+                    {"role": "user", "content": input_con_profilo_e_dieta},
+                    {"role": "system", "content": "Tu sei un nutrizionista che dà consigli personalizzati sulle diete"}
                 ]
             )
             print(input_con_profilo_e_dieta)
@@ -161,7 +160,7 @@ def write_chatgpt_for_dieta_info(openai, profilo_utente, mysql_cursor, telegram_
 
         # Verifica se 'malattie' è una lista o meno
         eta = str(eta) if eta is not None else "Non definito"
-        malattie = ", ".join(map(str, malattie)) if malattie and isinstance(malattie, list) else "Non definito"
+        malattie = str(malattie) if malattie and isinstance(malattie, list) else "Non definito"
         emozione = str(emozione) if emozione is not None else "Non definito"
         peso = str(peso) if peso is not None else "Non definito"
         altezza = str(altezza) if altezza is not None else "Non definito"
@@ -179,9 +178,7 @@ def write_chatgpt_for_dieta_info(openai, profilo_utente, mysql_cursor, telegram_
             f"La mia età è: {eta} | La mia malattia o disturbo è: {', '.join(malattie)} | Io quando mangio o penso al "
             f"cibo provo un sentimento: {emozione}"f" | Il mio peso è: {peso} kg| La mia altezza è: {altezza} cm| Il mio stile di vita è: {stile_vita}"
             f"| L'obiettivo per il quale ti sto chiedendo supporto: {obiettivo}  {dieta_settimanale_text}"
-            f" | Mettiti nei panni di un nutrizionista ma non dire che ti stai mettendo"
-            f" nei panni di un nutrizionista e "
-            f"tieni conto della mia età, delle mie malattie o disturbi, "
+            f" | tieni conto della mia età, delle mie malattie o disturbi, "
             f"l'emozione che provo quando mangio o penso al cibo, al mio peso, alla mia altezza, al mio stile di vita e"
             f"l'obiettivo per il quale ti sto chiedendo supporto"
             f"e alla mia dieta settimanale considerando anche"
@@ -196,7 +193,8 @@ def write_chatgpt_for_dieta_info(openai, profilo_utente, mysql_cursor, telegram_
         response = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
             messages=[
-                {"role": "user", "content": input_con_profilo_e_dieta}
+                {"role": "user", "content": input_con_profilo_e_dieta},
+                {"role": "system", "content": "Tu sei un nutrizionista che dà consigli personalizzati sulle diete"}
             ]
         )
 
