@@ -13,12 +13,16 @@ import subprocess
 import tempfile
 from datetime import datetime, time
 from sqlite3 import IntegrityError
-
+from PIL import Image  # Add this import
+from io import BytesIO
+import base64
 import requests
 import speech_recognition as sr
 from mysql.connector import errorcode
 from pydub import AudioSegment
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
+import json
+
 
 from src.connection import connect_mysql
 from src.controls import check_time_in_range
@@ -42,12 +46,12 @@ logger = logging.getLogger('telegram-bot')
 logging.getLogger('urllib3.connectionpool').setLevel('INFO')
 
 # Inizializzazione degli intervalli orari per inviare i reminder
-ORA_COLAZIONE_START = time(8, 0)
+ORA_COLAZIONE_START = time(6, 0)
 ORA_COLAZIONE_END = time(9, 0)
-ORA_PRANZO_START = time(11, 0)
-ORA_PRANZO_END = time(12, 40)
-ORA_CENA_START = time(16, 30)
-ORA_CENA_END = time(23, 50)
+ORA_PRANZO_START = time(12, 0)
+ORA_PRANZO_END = time(15, 00)
+ORA_CENA_START = time(18, 00)
+ORA_CENA_END = time(21, 00)
 
 reply_markup_emozioni = InlineKeyboardMarkup([
     [
@@ -307,6 +311,19 @@ def clear_audio():
             os.remove(_file)
 
 
+def download_and_encode_image(image_url):
+    response = requests.get(image_url)
+    if response.status_code == 200:
+        image_content = response.content
+        image = Image.open(BytesIO(image_content))
+        buffered = BytesIO()
+        image.save(buffered, format="JPEG")
+        return base64.b64encode(buffered.getvalue()).decode('utf-8')
+    else:
+        raise ValueError(f"Failed to download image from {image_url}, status code: {response.status_code}")
+
+
+
 def photo_recognizer(message, bot_telegram, openai):
     """
     Questa funzione permette di riconoscere le foto inviate dall'utente e ritornare il testo
@@ -337,28 +354,56 @@ def photo_recognizer(message, bot_telegram, openai):
         with tempfile.NamedTemporaryFile(delete=False, suffix=".jpg") as temp_file:
             temp_file.write(requests.get(image_url).content)
             temp_file.close()  # Chiudi il file dopo aver scritto
+            base64_image = download_and_encode_image(image_url)
+
+            headers = {
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {os.getenv('TOKEN_CHAT_GPT')}"
+            }
+
+            payload = {
+                "model": "gpt-4-vision-preview",
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Scrivi solo la quantità come questo formato di esempio 100g con accanto il nome del cibo. Non scrivere il punto finale"
+                            },
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:image/jpeg;base64,{base64_image}"
+                                }
+                            }
+                        ]
+                    }
+                ],
+                "max_tokens": 300
+            }
 
             # Utilizza OpenAI Vision per analizzare l'immagine
-            result = openai.Image.create(model="image-alpha-001", file=temp_file)
-            # Estrai informazioni dall'output di OpenAI Vision
-            image_description = result['data'][0]['description']
-            prompt = f"Scrivimi che cibo è {image_description}\nScrivi solo il nome del cibo e nient'altro?"
-            print(prompt)
+            result = requests.post("https://api.openai.com/v1/chat/completions", headers=headers, json=payload)
+            print(result)
 
-            chatgpt_response = openai.Completion.create(
-                model="text-davinci-003",
-                messages=[
-                    {"role": "system", "content": "You are a helpful assistant."},
-                    {"role": "user", "content": prompt},
-                ],
-            )
             # Esegui l'inferenza utilizzando il percorso temporaneo del file
-            if result:
-
-                return chatgpt_response
+            if result.status_code == 200:
+                chatgpt_response = result.json()
+                if 'choices' in chatgpt_response and chatgpt_response['choices']:
+                    content_value = chatgpt_response['choices'][0]['message']['content']
+                    return content_value
+                else:
+                    os.remove(temp_file.name)
+                    print("Errore durante l'estrazione del valore 'content' dal risultato di OpenAI API.")
+                    return bot_telegram.send_message(telegram_id,
+                                                     "Errore durante l'estrazione del risultato. Riprovare!")
             else:
                 os.remove(temp_file.name)
+                print(f"Errore durante la richiesta a OpenAI API. Codice di risposta: {result.status_code}")
+                print(result.text)  # Stampa il testo della risposta per ottenere dettagli aggiuntivi
                 return bot_telegram.send_message(telegram_id, "Foto non riconosciuta. Riprovare!")
+
 
     except Exception as e:
         print(f"Error in photo_recognizer: {e}")
@@ -404,6 +449,18 @@ class ProfilazioneBot:
                                           "Puoi utilizzare il bot, ma non acconsentendo alla profilazione, "
                                           "le mie risposte risulteranno meno efficienti😢")
                 self.profile_completed = True
+                if check_time_in_range(current_time_reminder, ORA_COLAZIONE_START, ORA_COLAZIONE_END):
+                    bot_telegram.send_message(user_id,
+                                              "Colazione time! 🥛 Cosa hai mangiato a colazione? \n⚠️ Indica prima del cibo "
+                                              "la quantità.")
+
+                elif check_time_in_range(current_time_reminder, ORA_PRANZO_START, ORA_PRANZO_END):
+                    bot_telegram.send_message(user_id,
+                                              "Pranzo time! 🍽 Cosa hai mangiato a pranzo? \n⚠️ Indica prima del cibo la quantità.")
+
+                elif check_time_in_range(current_time_reminder, ORA_CENA_START, ORA_CENA_END):
+                    bot_telegram.send_message(user_id,
+                                              "Cena time! 🍽 Cosa hai mangiato a cena? \n⚠️ Indica prima del cibo la quantità.")
 
             if user_response.startswith('emozione_'):
                 emozione_selezionata = user_response[len('emozione_'):]
@@ -422,7 +479,6 @@ class ProfilazioneBot:
                                                "Grazie! Profilo completato ✅\n\n Chiedimi ciò che desideri😊")
                 self.index += 1
                 self.profile_completed = True
-
                 if check_time_in_range(current_time_reminder, ORA_COLAZIONE_START, ORA_COLAZIONE_END):
                     bot_telegram.send_message(user_id,
                                               "Colazione time! 🥛 Cosa hai mangiato a colazione? \n⚠️ Indica prima del cibo "
@@ -435,6 +491,13 @@ class ProfilazioneBot:
                 elif check_time_in_range(current_time_reminder, ORA_CENA_START, ORA_CENA_END):
                     bot_telegram.send_message(user_id,
                                               "Cena time! 🍽 Cosa hai mangiato a cena? \n⚠️ Indica prima del cibo la quantità.")
+            elif user_response.startswith('consumo_acqua_'):
+                consumo_acqua_selezionato = user_response[len('consumo_acqua_'):]
+                print(consumo_acqua_selezionato)
+                self.salva_consumo_acqua(user_id, consumo_acqua_selezionato)
+
+
+
 
 
 
@@ -501,3 +564,45 @@ class ProfilazioneBot:
             print(f"Vincolo di integrità violato: {integrity_error}")
 
             self.bot_telegram.send_message(chat_id, text="⚠️ Hai inserito un valore errato. Riprova.")
+
+    def salva_consumo_acqua(self, chat_id, consumo_acqua):
+        global mysql_connection, mysql_cursor
+        try:
+            mysql_connection, mysql_cursor = connect_mysql()
+
+            # Ottieni l'ultimo ID presente nella tabella giorno_settimana
+            get_last_id_query = "SELECT MAX(giorno_settimana_id) FROM giorno_settimana"
+            mysql_cursor.execute(get_last_id_query)
+            last_giorno_settimana_id = mysql_cursor.fetchone()[0]
+
+            if last_giorno_settimana_id is not None:
+                # Esegui l'inserimento o l'aggiornamento nella tabella consumo_acqua
+                insert_update_query = """
+                INSERT INTO consumo_acqua (giorno_settimana_id, consumo)
+                VALUES (%s, %s)
+                ON DUPLICATE KEY UPDATE consumo = %s, giorno_settimana_id = LAST_INSERT_ID(giorno_settimana_id)
+                """
+                mysql_cursor.execute(insert_update_query, (last_giorno_settimana_id, consumo_acqua, consumo_acqua))
+
+                # Commit delle modifiche al database
+                mysql_connection.commit()
+
+                # Ottieni l'ID dell'ultimo record inserito o aggiornato
+                last_inserted_id_query = "SELECT LAST_INSERT_ID()"
+                mysql_cursor.execute(last_inserted_id_query)
+                last_inserted_id = mysql_cursor.fetchone()[0]
+
+                # Invia un messaggio di conferma all'utente
+                confirmation_message = f"Grazie! 😊 Il tuo consumo di acqua giornaliero è stato registrato.✅\n Hai consumato: {consumo_acqua} litri💧\n\n Chiedimi ciò che desideri 😊"
+                self.bot_telegram.send_message(chat_id, confirmation_message, disable_notification=True)
+
+        except IntegrityError as integrity_error:
+            print(f"Vincolo di integrità violato: {integrity_error}")
+            self.bot_telegram.send_message(chat_id, text="⚠️ Hai inserito un valore errato. Riprova.")
+
+
+
+
+
+
+

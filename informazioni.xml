@@ -3,11 +3,21 @@
     <telegram>
         <informazioni type="info">
             <spiegazioni>
-                Ciao {nome} 👋 posso assisterti per:
-                ⏰Invio di reminder per ottenere informazioni sulla tua dieta e supportarti al meglio
-                👤Ogni settimana ti invierò un reminder per  ricordarti di visualizzare il report settimanale con un feedback personalizzato
-                🤔Hai dubbi su valori nutrizionali o se è consigliabile evitare o consumare determinati cibi? Puoi chiedermelo
-                🤖Rispondendo alle domande di profilazione mi consentirai di fornirti risposte personalizzate ed efficienti.
+                Ciao {nome} 👋 posso assisterti per: _bn_
+
+                ⏰Invio di reminder per registrare le informazioni sulla tua dieta e supportarti al meglio _bn_
+
+                💧Ricordarti di inserire quanta acqua hai bevuto giornalmente _bn_
+
+                👤Ogni settimana ti invierò un reminder per  ricordarti di visualizzare il report settimanale con un feedback personalizzato _bn_
+
+                🤔Hai dubbi su valori nutrizionali o se è consigliabile evitare o consumare determinati cibi? Puoi chiedermelo _bn_
+
+                🤖Rispondendo alle domande di profilazione mi consentirai di fornirti risposte personalizzate ed efficienti _bn_
+
+                📸Inviare foto per riconoscere i cibi e le quantità cosi da salvarli nella tua dieta oppure per chiedere informazioni _bn_
+
+                ⏺Registrare messaggi vocali per salvare i cibi nella tua dieta settimanale oppure per chiedere informazioni _bn_
 
                 Grazie e buon utilizzo 😊
 

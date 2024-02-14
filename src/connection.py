@@ -151,6 +151,15 @@ def create_tables(cursor, database_name):
         """)
 
         cursor.execute("""
+                CREATE TABLE IF NOT EXISTS consumo_acqua (
+                  consumo_acqua_id INT AUTO_INCREMENT PRIMARY KEY,
+                  giorno_settimana_id INT UNIQUE,
+                  consumo DECIMAL(4,2), 
+                  FOREIGN KEY(giorno_settimana_id) REFERENCES giorno_settimana(giorno_settimana_id)
+                );
+                """)
+
+        cursor.execute("""
         CREATE TABLE IF NOT EXISTS periodo_giorno (
          periodo_giorno_id INT AUTO_INCREMENT PRIMARY KEY,
          nome VARCHAR(255) NOT NULL CHECK (nome IN ('Colazione', 'Pranzo', 'Cena')),

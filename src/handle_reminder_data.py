@@ -41,7 +41,28 @@ def send_week_reminder_message(event, bot_telegram):
         for telegram_id in telegram_ids:
             bot_telegram.send_message(telegram_id,
                                       "E' passata una settimana! Tieni d'occhio la tua dieta. Tocca su /report",
-                                      trem.sleep(20))
+                                      trem.sleep(60*60*7))
+def send_water_reminder_message(event, bot_telegram):
+    """
+    Questa funzione serve per inviare un reminder settimanale per ricordare di visualizzare
+     i dati della dieta settimanale
+
+    :param event: serve per gestire gli eventi e alternare l'esecuzione dei metodi
+    :type event: Event
+    :param bot_telegram: corrisponde alla variabile che contiene l'api key del proprio bot_telegram
+                        e permette di accedere ai metodi della libreria Telebot
+    :type bot_telegram: Telebot
+
+    :return: il reminder da inviare all'utente
+    :rtype: Message
+    """
+    telegram_ids = get_all_telegram_ids()
+
+    if not event.is_set():
+        for telegram_id in telegram_ids:
+            bot_telegram.send_message(telegram_id,
+                                      "💧Registra il tuo consumo di acqua di oggi con il comando /consumo_acqua💧",
+                                      trem.sleep(60*60*24))
 
 
 def get_or_insert_dieta_settimanale(cursor, telegram_id, date):
@@ -262,7 +283,7 @@ def save_user_food_response(bot_telegram, mysql_cursor, mysql_connection, telegr
             mysql_connection.commit()
 
         return bot_telegram.send_message(telegram_id,
-                                         f"{meal_type} inserito/a correttamente! Ora puoi chiedermi ciò che desideri 😊")
+                                         f"{meal_type} inserito/a correttamente! ✅\n\n Ora puoi chiedermi ciò che desideri 😊")
 
     except Exception as e:
         print(f"Errore durante l'inserimento del cibo: {e}")

@@ -27,7 +27,7 @@ from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from src.chatGPT_response import write_chatgpt, write_chatgpt_for_dieta_info
 from src.connection import connect, connect_mysql
 from src.controls import check_time_in_range, split_chunks, control_tag
-from src.handle_reminder_data import save_user_food_response, send_week_reminder_message
+from src.handle_reminder_data import save_user_food_response, send_week_reminder_message, send_water_reminder_message
 from src.handle_user_data import get_user_profile, create_new_user, get_all_telegram_ids, \
     voice_recognizer, clear_audio, photo_recognizer, get_dieta_settimanale_ids, \
     get_dieta_settimanale_profile, ProfilazioneBot
@@ -154,6 +154,9 @@ EDIT_COMMAND = 'modifica'
 PROFILO_COMMAND = 'profilo'
 REPORT_COMMAND = 'report'
 INFO_COMMAND = 'info'
+CANCELLA_COMMAND = 'cancella'
+CONSUMO_ACQUA_COMMAND = 'consumo_acqua'
+DIETA_SANA_COMMAND = 'dieta_sana'
 
 # Periodo giorno
 meal_type = None
@@ -174,14 +177,17 @@ api_key = os.getenv('GOOGLE_CLOUD_API_KEY')
 event = threading.Event()
 
 # Inizializzazione degli intervalli orari per inviare i reminder
-ORA_COLAZIONE_START = time(8, 0)
+ORA_COLAZIONE_START = time(6, 0)
 ORA_COLAZIONE_END = time(9, 0)
-ORA_PRANZO_START = time(11, 0)
-ORA_PRANZO_END = time(12, 40)
-ORA_CENA_START = time(16, 30)
-ORA_CENA_END = time(23, 50)
+ORA_PRANZO_START = time(12, 0)
+ORA_PRANZO_END = time(15, 00)
+ORA_CENA_START = time(18, 00)
+ORA_CENA_END = time(21, 00)
 
-ORA_REMINDER_SETTIMANALE = time(11, 13, 10)
+ORA_ACQUA_START = time(22, 00)
+ORA_ACQUA_END = time(23, 00)
+
+ORA_REMINDER_SETTIMANALE = time(16, 00)
 
 # inizializzazione della coda per i messaggi dei reminder
 queue = Queue()
@@ -240,6 +246,15 @@ reply_markup_confirmation = InlineKeyboardMarkup([
      InlineKeyboardButton("No", callback_data='cancella_no')]
 ])
 
+reply_markup_water = InlineKeyboardMarkup([
+    [InlineKeyboardButton("0.5", callback_data='consumo_acqua_0.5'),
+     InlineKeyboardButton("1.0", callback_data='consumo_acqua_1.0'),
+     InlineKeyboardButton("1.5", callback_data='consumo_acqua_1.5'),
+     InlineKeyboardButton("2.0", callback_data='consumo_acqua_2.0'),
+     InlineKeyboardButton("2.5", callback_data='consumo_acqua_2.5'),
+     InlineKeyboardButton("3.0", callback_data='consumo_acqua_3.0')]
+])
+
 if __name__ == '__main__':
 
     @bot_telegram.message_handler(commands=[REPORT_COMMAND])
@@ -292,6 +307,12 @@ if __name__ == '__main__':
                    JOIN cibo c ON pg.periodo_giorno_id = c.periodo_giorno_id
                    GROUP BY gs.nome;
                    """
+            query_consumo_acqua_giornaliero = """
+                   SELECT gs.nome AS giorno, SUM(ca.consumo) AS totale_consumo_acqua
+                   FROM giorno_settimana gs
+                   JOIN consumo_acqua ca ON gs.giorno_settimana_id = ca.giorno_settimana_id
+                   GROUP BY gs.nome;
+                   """
 
             # Esegui le query
             mysql_cursor.execute(query_colazione)
@@ -306,6 +327,9 @@ if __name__ == '__main__':
             mysql_cursor.execute(query_totale_calorie)
             data_totale_calorie = mysql_cursor.fetchall()
 
+            mysql_cursor.execute(query_consumo_acqua_giornaliero)
+            data_consumo_acqua_giornaliero = mysql_cursor.fetchall()
+
             # Chiudi la connessione al datab
             # ase
             mysql_connection.close()
@@ -316,39 +340,49 @@ if __name__ == '__main__':
             df_pranzo = pd.DataFrame(data_pranzo, columns=['Giorno', 'Calorie Pranzo'])
             df_cena = pd.DataFrame(data_cena, columns=['Giorno', 'Calorie Cena'])
             df_totale_calorie = pd.DataFrame(data_totale_calorie, columns=['Giorno', 'Totale Calorie'])
+            df_data_consumo_acqua_giornaliero = pd.DataFrame(data_consumo_acqua_giornaliero, columns=['Giorno', 'Consumo Acqua'])
 
             # Crea i grafici senza mostrare la GUI
-            plt.figure(figsize=(15, 10))
+
 
             # Grafico Colazione
-            plt.subplot(221)
-            plt.bar(df_colazione['Giorno'], df_colazione['Calorie Colazione'])
-            plt.title('Kcal durante la colazione')
-            plt.savefig('colazione.png')
+            fig, axs = plt.subplots(nrows=2, ncols=3, figsize=(12, 8))
+
+            # Grafico Colazione
+            axs[0, 0].bar(df_colazione['Giorno'], df_colazione['Calorie Colazione'])
+            axs[0, 0].set_title('Kcal durante la colazione')
 
             # Grafico Pranzo
-            plt.subplot(222)
-            plt.bar(df_pranzo['Giorno'], df_pranzo['Calorie Pranzo'])
-            plt.title('Kcal durante il pranzo')
-            plt.savefig('pranzo.png')
+            axs[0, 1].bar(df_pranzo['Giorno'], df_pranzo['Calorie Pranzo'])
+            axs[0, 1].set_title('Kcal durante il pranzo')
 
             # Grafico Cena
-            plt.subplot(223)
-            plt.bar(df_cena['Giorno'], df_cena['Calorie Cena'])
-            plt.title('Kcal durante la cena')
-            plt.savefig('cena.png')
+            axs[0, 2].bar(df_cena['Giorno'], df_cena['Calorie Cena'])
+            axs[0, 2].set_title('Kcal durante la cena')
 
             # Grafico Totale Calorie
-            plt.subplot(224)
-            plt.bar(df_totale_calorie['Giorno'], df_totale_calorie['Totale Calorie'])
-            plt.title('Totale Kcal per giorno')
-            plt.savefig('totale_calorie.png')
+            axs[1, 0].bar(df_totale_calorie['Giorno'], df_totale_calorie['Totale Calorie'])
+            axs[1, 0].set_title('Totale Kcal per giorno')
+
+            # Grafico Consumo acqua giornaliero
+            axs[1, 1].bar(df_data_consumo_acqua_giornaliero['Giorno'],
+                          df_data_consumo_acqua_giornaliero['Consumo Acqua'])
+            axs[1, 1].set_title('Consumo giornaliero di acqua')
+
+            # Nascondere l'asse vuoto
+            axs[1, 2].axis('off')
+
+            # Migliorare la disposizione
+            plt.tight_layout()
+
+            # Salvare il file
+            plt.savefig('grafici.png')
 
             # Chiudi la figura
             plt.close()
 
             # Crea una lista con il percorso delle immagini
-            images = ['totale_calorie.png']
+            images = ['grafici.png']
 
             # Crea un documento PDF con ReportLab
             pdf_output = BytesIO()
@@ -415,7 +449,7 @@ if __name__ == '__main__':
             bot_telegram.send_document(telegram_id, document=('dieta_settimanale.pdf', pdf_file))
 
             # Cancella le immagini
-            image_files = ['colazione.png', 'pranzo.png', 'cena.png', 'totale_calorie.png']
+            image_files = ['grafici.png']
             for image_file in image_files:
                 if os.path.exists(image_file):
                     os.remove(image_file)
@@ -518,14 +552,46 @@ if __name__ == '__main__':
 
 
     # Metodo per gestire il comando /cancella
-    @bot_telegram.message_handler(commands=['cancella'])
+    @bot_telegram.message_handler(commands=[CANCELLA_COMMAND])
     def delete_profile_data(message):
         telegram_id = message.chat.id
 
         # Chiedi conferma all'utente prima di cancellare i dati
-        confirmation_message = "Sei sicuro di voler cancellare i dati del profilo? Questa azione non può essere annullata."
+        confirmation_message = "❗️Sei sicuro di voler cancellare i dati del profilo? Questa azione non può essere annullata.❗️"
 
         bot_telegram.send_message(telegram_id, confirmation_message, reply_markup=reply_markup_confirmation)
+
+
+    @bot_telegram.message_handler(commands=[CONSUMO_ACQUA_COMMAND])
+    def delete_profile_data(message):
+        telegram_id = message.chat.id
+
+        # Chiedi conferma all'utente prima di cancellare i dati
+        confirmation_message = "Indicativamente scegli la quantità di acqua 💧 consumata:"
+
+        bot_telegram.send_message(telegram_id, confirmation_message, reply_markup=reply_markup_water)
+
+
+    @bot_telegram.message_handler(commands=[DIETA_SANA_COMMAND])
+    def indicazioni_dieta_sana(message):
+        telegram_id = message.chat.id
+        user_profile = get_user_profile(telegram_id)
+        username = user_profile.get('nome_utente')
+        # Chiedi conferma all'utente prima di cancellare i dati
+        dieta_sana_message = (f" Ciao {username} 👋 per mantenere uno stato di buona salute è consigliato consumare:\n\n"
+                              f"🍎Frutta e Verdura🥦: Consuma una varietà di frutta e verdura per ottenere una vasta gamma di nutrienti, vitamine e antiossidanti\n\n"
+                              "🌽Cereali Integrali: Scegli cereali integrali come avena, riso integrale e quinoa per fibre, vitamine e minerali\n\n"
+                              "🍗Proteine: Includi fonti di proteine magre come pollo, pesce, uova, legumi e tofu per la costruzione e il ripristino muscolare\n\n"
+                              "🥑Grassi Sani: Opta per grassi sani come quelli presenti in avocado, noci, semi e olio d'oliva. Limita l'assunzione di grassi saturi e trans\n\n"
+                              "🍶Latticini o Alternative: Assicurati di ottenere sufficiente calcio attraverso latticini o alternative come latte di mandorle o yogurt a base vegetale\n\n"
+                              "Limita lo 🍚Zucchero e il Sale🧂: Riduci l'assunzione di zuccheri aggiunti e sale. Leggi attentamente le etichette alimentari\n\n"
+                              "🚰Idratazione: Bevi abbondante acqua per mantenere il corpo ben idratato\n\n"
+                              "🍽Controllo delle Porzioni: Mangia porzioni moderate e presta attenzione alla fame e alla sazietà\n\n"
+                              "🔄Varietà e Moderazione: Mantieni una dieta varia ed equilibrata e evita l'eccesso in qualsiasi categoria alimentare\n\n"
+                              "🏃‍♂️Attività fisica: Fare attività fisica per migliorare la salute cardiovascolare e il benessere mentale\n\n"
+                              "Per maggiori dettagli consultare le linee guida del CREA al segente indirizzo: https://www.salute.gov.it/imgs/C_17_pubblicazioni_2915_allegato.pdf  ")
+
+        bot_telegram.send_message(telegram_id, dieta_sana_message)
 
 
     # Metodo per gestire il comando /start
@@ -611,7 +677,15 @@ if __name__ == '__main__':
 
                     reminder_week_message_thread = threading.Thread(target=send_week_reminder_message, daemon=True,
                                                                     args=(event, bot_telegram,))
+
                     reminder_week_message_thread.start()
+
+                    if check_time_in_range(current_time_reminder, ORA_ACQUA_START, ORA_ACQUA_END):
+                        reminder_water_message_thread = threading.Thread(target=send_water_reminder_message, daemon=True,
+                                                                     args=(event, bot_telegram,))
+                        reminder_water_message_thread.start()
+
+
                     if message.reply_to_message and message.reply_to_message.text in user_response_message:
                         user_profile = get_user_profile(telegram_id)
                         timestamp = message.reply_to_message.date
@@ -636,9 +710,14 @@ if __name__ == '__main__':
                                 splitted = split_chunks(chunk)
 
                                 # Invia ciascun pezzo ogni 5 secondi
-                                for split_chunk in splitted:
-                                    split_chunk += "..."
+                                for index, split_chunk in enumerate(splitted):
+                                    if index == len(splitted) - 1:  # Verifica se è l'ultimo elemento
+                                        split_chunk += "\nE' tutto. Sono a tua disposizione per altre domande."
+                                    else:
+                                        split_chunk += "..."
                                     bot_telegram.send_message(telegram_id, split_chunk, trem.sleep(8))
+
+
                     else:
                         if not check_time_in_range(current_time_reminder, ORA_COLAZIONE_START,
                                                    ORA_COLAZIONE_END) or check_time_in_range(current_time_reminder,
@@ -746,7 +825,7 @@ def handle_reminder_response(message):
                                             text, app_id, app_key)
 
                 event.clear()
-                event.wait(40)
+                event.wait(60*60*3)
                 event_send_reminder.set()
                 event.set()
         elif check_time_in_range(current_time_reminder, ORA_PRANZO_START, ORA_PRANZO_END):
@@ -772,7 +851,7 @@ def handle_reminder_response(message):
                     save_user_food_response(bot_telegram, mysql_cursor, mysql_connection, telegram_id, meal_type,
                                             text, app_id, app_key)
                 event.clear()
-                event.wait(40)
+                event.wait(60*60*3)
                 event_send_reminder.set()
                 event.set()
 
@@ -802,7 +881,7 @@ def handle_reminder_response(message):
                                             text, app_id, app_key)
 
                 event.clear()
-                event.wait(40)
+                event.wait(60*60*3)
                 event_send_reminder.set()
                 event.set()
         else:
@@ -959,19 +1038,19 @@ def send_reminder_message(event, bot_telegram, ORA_COLAZIONE_START, ORA_COLAZION
                 bot_telegram.send_message(telegram_id,
                                           "Colazione time! 🥛 Cosa hai mangiato a colazione? \n⚠️ Indica prima del cibo "
                                           "la quantità.",
-                                          trem.sleep(40))
+                                          trem.sleep(60*60*3))
                 event_send_reminder.clear()  # Disattiva l'evento per inviare il reminder
 
             elif check_time_in_range(current_time_reminder, ORA_PRANZO_START, ORA_PRANZO_END):
                 bot_telegram.send_message(telegram_id,
                                           "Pranzo time! 🍽 Cosa hai mangiato a pranzo? \n⚠️ Indica prima del cibo la quantità.",
-                                          trem.sleep(40))
+                                          trem.sleep(60*60*3))
                 event_send_reminder.clear()  # Disattiva l'evento per inviare il reminder
 
             elif check_time_in_range(current_time_reminder, ORA_CENA_START, ORA_CENA_END):
                 bot_telegram.send_message(telegram_id,
                                           "Cena time! 🍽 Cosa hai mangiato a cena? \n⚠️ Indica prima del cibo la quantità.",
-                                          trem.sleep(40))
+                                          trem.sleep(60*60*3))
             else:
                 event.clear()
 

@@ -51,6 +51,7 @@ def write_chatgpt(bot_telegram, openai, message, profilo_utente, mysql_cursor, t
         obiettivo = profilo_utente.get('obiettivo')
 
         dieta_settimanale_info = get_dieta_settimanale_info(mysql_cursor, telegram_id)
+        consumo_acqua_medio = get_avg_water_consumption(mysql_cursor, telegram_id)
 
         if dieta_settimanale_info:
             # Costruisci una rappresentazione testuale delle diete settimanali
@@ -61,13 +62,9 @@ def write_chatgpt(bot_telegram, openai, message, profilo_utente, mysql_cursor, t
             input_con_profilo_e_dieta = (
                 f"La mia età è: {eta} | La mia malattia o disturbo è: {', '.join(malattie)} | Io quando mangio o penso al "
                 f"cibo provo un sentimento: {emozione}"f" | Il mio peso è: {peso} kg| La mia altezza è: {altezza} cm| Il mio stile di vita è: {stile_vita}"
-                f"| L'obiettivo per il quale ti sto chiedendo supporto: {obiettivo}  {dieta_settimanale_text}"
+                f"| L'obiettivo per il quale ti sto chiedendo supporto: {obiettivo} | Il mio consumo medio di acqua al giorno è: {consumo_acqua_medio}litri |La mia dieta settimanale è: {dieta_settimanale_text}"
                 f" | Devi scrivere che sei un'intelligenza artificiale."
-                f"tieni conto della mia età, delle mie malattie o disturbi, "
-                f"l'emozione che provo quando mangio o penso al cibo, al mio peso, alla mia altezza, al mio stile di vita e "
-                f"l'obiettivo per il quale ti sto chiedendo supporto"
-                f"e alla mia dieta settimanale considerando anche"
-                f" i valori nutrizionali dei cibi"
+                f"tieni conto di tutte le informazioni che ti ho scritto e dei valori nutrizionali dei cibi"
                 f" e adatta il tuo linguaggio "
                 f"prima di rispondere alla seguente domanda:"
                 f" |\n{message_text}"
@@ -87,10 +84,10 @@ def write_chatgpt(bot_telegram, openai, message, profilo_utente, mysql_cursor, t
             bot_telegram.send_message(telegram_id, "Sto pensando...💭")
             # Se la domanda riguarda il cibo, invia la richiesta a OpenAI con le informazioni del profilo e della dieta
             response = openai.ChatCompletion.create(
-                model="gpt-3.5-turbo",
+                model="gpt-4-0125-preview",
                 messages=[
                     {"role": "user", "content": input_con_profilo_e_dieta},
-                    {"role": "system", "content": "Tu sei un nutrizionista che dà consigli personalizzati sulle diete"}
+                    {"role": "system", "content": "Tu sei un nutrizionista. Non specificarlo."}
                 ]
             )
             print(input_con_profilo_e_dieta)
@@ -177,12 +174,10 @@ def write_chatgpt_for_dieta_info(openai, profilo_utente, mysql_cursor, telegram_
         input_con_profilo_e_dieta = (
             f"La mia età è: {eta} | La mia malattia o disturbo è: {', '.join(malattie)} | Io quando mangio o penso al "
             f"cibo provo un sentimento: {emozione}"f" | Il mio peso è: {peso} kg| La mia altezza è: {altezza} cm| Il mio stile di vita è: {stile_vita}"
-            f"| L'obiettivo per il quale ti sto chiedendo supporto: {obiettivo}  {dieta_settimanale_text}"
-            f" | tieni conto della mia età, delle mie malattie o disturbi, "
-            f"l'emozione che provo quando mangio o penso al cibo, al mio peso, alla mia altezza, al mio stile di vita e"
-            f"l'obiettivo per il quale ti sto chiedendo supporto"
-            f"e alla mia dieta settimanale considerando anche"
-            f" i valori nutrizionali dei cibi e adatta il tuo linguaggio. "
+            f"| L'obiettivo per il quale ti sto chiedendo supporto: {obiettivo} | Il mio consumo medio di acqua al giorno è: {consumo_acqua_medio}litri |La mia dieta settimanale è: {dieta_settimanale_text}"
+            f" | Devi scrivere che sei un'intelligenza artificiale."
+            f"tieni conto di tutte le informazioni che ti ho scritto e dei valori nutrizionali dei cibi"
+            f" e adatta il tuo linguaggio "
             f"Dammi un brevissimo feedback sulla mia dieta settimanale considerando le informazioni che ti ho fornito."
             f" Ricorda che mi devi rispondere solo con si hai seguito una dieta corretta oppure no, non hai seguito una"
             f" dieta corretta, accompagnati da una sola frase"
@@ -191,10 +186,10 @@ def write_chatgpt_for_dieta_info(openai, profilo_utente, mysql_cursor, telegram_
 
         # Invia la richiesta a OpenAI con le informazioni del profilo e della dieta
         response = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
+            model="gpt-4-0125-preview",
             messages=[
                 {"role": "user", "content": input_con_profilo_e_dieta},
-                {"role": "system", "content": "Tu sei un nutrizionista che dà consigli personalizzati sulle diete"}
+                {"role": "system", "content": "Tu sei un nutrizionista. Non specificarlo."}
             ]
         )
 
@@ -276,3 +271,38 @@ def get_dieta_settimanale_info(cursor, telegram_id):
     except Exception as e:
         print(f"Si è verificato un errore durante l'estrazione delle informazioni sulla dieta settimanale: {e}")
         return None
+
+def get_avg_water_consumption(cursor, telegram_id):
+    """
+    Questa funzione permette di recuperare la media di acqua consumata in totale.
+
+    :param cursor: cursor to execute queries
+    :type cursor: execute, fetchall
+    :param telegram_id: Telegram ID of the user
+    :type telegram_id: int
+
+    :return: the average water consumption as a string
+    :rtype: str
+    """
+    try:
+        # Execute the query to get the average water consumption for all users
+        cursor.execute("""
+            SELECT AVG(consumo) AS avg_consumption
+            FROM consumo_acqua;
+        """)
+
+        # Get the result of the query
+        result = cursor.fetchone()
+
+        # Check if there is a result
+        if result and result[0] is not None:  # Use index 0 to access the value in the tuple
+            avg_water_consumption = result[0]
+            print(avg_water_consumption)
+            return avg_water_consumption
+
+    except Exception as e:
+        print(f"An error occurred while extracting information on average water consumption: {e}")
+        return None
+
+
+
