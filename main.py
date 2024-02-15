@@ -241,6 +241,11 @@ reply_markup_consenso = InlineKeyboardMarkup([
      InlineKeyboardButton("No", callback_data='consenso_no')]
 ])
 
+reply_markup_consenso_modifica = InlineKeyboardMarkup([
+    [InlineKeyboardButton("Si", callback_data='consenso_modifica_si'),
+     InlineKeyboardButton("No", callback_data='consenso_modifica_no')]
+])
+
 reply_markup_confirmation = InlineKeyboardMarkup([
     [InlineKeyboardButton("Si", callback_data='cancella_si'),
      InlineKeyboardButton("No", callback_data='cancella_no')]
@@ -567,7 +572,7 @@ if __name__ == '__main__':
         telegram_id = message.chat.id
 
         # Chiedi conferma all'utente prima di cancellare i dati
-        confirmation_message = "Indicativamente scegli la quantità di acqua 💧 consumata:"
+        confirmation_message = "Indicativamente scegli i litri di acqua 💧 consumata:"
 
         bot_telegram.send_message(telegram_id, confirmation_message, reply_markup=reply_markup_water)
 
@@ -578,20 +583,20 @@ if __name__ == '__main__':
         user_profile = get_user_profile(telegram_id)
         username = user_profile.get('nome_utente')
         # Chiedi conferma all'utente prima di cancellare i dati
-        dieta_sana_message = (f" Ciao {username} 👋 per mantenere uno stato di buona salute è consigliato consumare:\n\n"
-                              f"🍎Frutta e Verdura🥦: Consuma una varietà di frutta e verdura per ottenere una vasta gamma di nutrienti, vitamine e antiossidanti\n\n"
-                              "🌽Cereali Integrali: Scegli cereali integrali come avena, riso integrale e quinoa per fibre, vitamine e minerali\n\n"
-                              "🍗Proteine: Includi fonti di proteine magre come pollo, pesce, uova, legumi e tofu per la costruzione e il ripristino muscolare\n\n"
-                              "🥑Grassi Sani: Opta per grassi sani come quelli presenti in avocado, noci, semi e olio d'oliva. Limita l'assunzione di grassi saturi e trans\n\n"
-                              "🍶Latticini o Alternative: Assicurati di ottenere sufficiente calcio attraverso latticini o alternative come latte di mandorle o yogurt a base vegetale\n\n"
-                              "Limita lo 🍚Zucchero e il Sale🧂: Riduci l'assunzione di zuccheri aggiunti e sale. Leggi attentamente le etichette alimentari\n\n"
-                              "🚰Idratazione: Bevi abbondante acqua per mantenere il corpo ben idratato\n\n"
-                              "🍽Controllo delle Porzioni: Mangia porzioni moderate e presta attenzione alla fame e alla sazietà\n\n"
-                              "🔄Varietà e Moderazione: Mantieni una dieta varia ed equilibrata e evita l'eccesso in qualsiasi categoria alimentare\n\n"
-                              "🏃‍♂️Attività fisica: Fare attività fisica per migliorare la salute cardiovascolare e il benessere mentale\n\n"
-                              "Per maggiori dettagli consultare le linee guida del CREA al segente indirizzo: https://www.salute.gov.it/imgs/C_17_pubblicazioni_2915_allegato.pdf  ")
+        dieta_sana_message = (f" Ciao <b>{username}</b> 👋 per mantenere uno stato di buona salute è consigliato:\n\n"
+                              f"🍎<b>Frutta e Verdura🥦:</b> Consuma una varietà di frutta e verdura per ottenere una vasta gamma di nutrienti, vitamine e antiossidanti\n\n"
+                              "🌽<b>Cereali Integrali:</b> Scegli cereali integrali come avena, riso integrale e quinoa per fibre, vitamine e minerali\n\n"
+                              "🍗<b>Proteine:</b> Includi fonti di proteine magre come pollo, pesce, uova, legumi e tofu per la costruzione e il ripristino muscolare\n\n"
+                              "🥑<b>Grassi Sani:</b> Opta per grassi sani come quelli presenti in avocado, noci, semi e olio d'oliva. Limita l'assunzione di grassi saturi e trans\n\n"
+                              "🍶<b>Latticini o Alternative:</b> Assicurati di ottenere sufficiente calcio attraverso latticini o alternative come latte di mandorle o yogurt a base vegetale\n\n"
+                              "<b>Limita lo 🍚Zucchero e il Sale🧂:</b> Riduci l'assunzione di zuccheri aggiunti e sale. Leggi attentamente le etichette alimentari\n\n"
+                              "🚰<b>Idratazione:</b> Bevi abbondante acqua per mantenere il corpo ben idratato\n\n"
+                              "🍽<b>Controllo delle Porzioni:</b> Mangia porzioni moderate e presta attenzione alla fame e alla sazietà\n\n"
+                              "🔄<b>Varietà e Moderazione:</b> Mantieni una dieta varia ed equilibrata e evita l'eccesso in qualsiasi categoria alimentare\n\n"
+                              "🏃‍♂️<b>Attività fisica:</b> Fare attività fisica per migliorare la salute cardiovascolare e il benessere mentale\n\n"
+                              "Per maggiori dettagli consultare le linee guida del CREA al seguente indirizzo: https://www.salute.gov.it/imgs/C_17_pubblicazioni_2915_allegato.pdf  ")
 
-        bot_telegram.send_message(telegram_id, dieta_sana_message)
+        bot_telegram.send_message(telegram_id, dieta_sana_message,parse_mode='HTML', disable_notification=True)
 
 
     # Metodo per gestire il comando /start
@@ -626,7 +631,7 @@ if __name__ == '__main__':
             consenso_message = (
                 f"Ciao {username}! 😁\n\n⚠️ Prima di cominciare con le domande di profilazione, dobbiamo ottenere il tuo consenso per "
                 "l'uso dei dati.\n\n Ti ricordo che conoscendo i dati del tuo profilo le mie risposte saranno più efficienti 🤖.\n\n Acconsenti?")
-            bot_telegram.send_message(telegram_id, consenso_message, reply_markup=reply_markup_consenso)
+            bot_telegram.send_message(telegram_id, consenso_message, reply_markup=reply_markup_consenso_modifica)
             start_command_used = True
 
 
@@ -716,7 +721,6 @@ if __name__ == '__main__':
                                     else:
                                         split_chunk += "..."
                                     bot_telegram.send_message(telegram_id, split_chunk, trem.sleep(8))
-
 
                     else:
                         if not check_time_in_range(current_time_reminder, ORA_COLAZIONE_START,
@@ -885,6 +889,7 @@ def handle_reminder_response(message):
                 event_send_reminder.set()
                 event.set()
         else:
+            handle_profile_response(message)
             event.clear()
 
     except Exception as main_exception:

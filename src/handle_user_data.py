@@ -433,11 +433,22 @@ class ProfilazioneBot:
                 # Esegui l'aggiornamento nel database per cancellare i dati del profilo
                 delete_user_profile(user_id)
                 # Invia un messaggio di conferma
-                bot_telegram.send_message(user_id, "I dati del profilo sono stati cancellati.")
+                bot_telegram.send_message(user_id, "I dati del 👤profilo sono stati cancellati🚨.\n Considera di condividere i dati del tuo profilo per rendere le mie risposte più efficienti😊")
 
             elif call.data == 'cancella_no':
                 # L'utente ha scelto di non cancellare i dati
-                bot_telegram.send_message(user_id, "Hai scelto di non cancellare i dati del profilo.")
+                bot_telegram.send_message(user_id, "Hai scelto di non cancellare i dati del profilo😊. \n Le mie risposte saranno più efficienti😁")
+
+            if user_response == 'consenso_modifica_si':
+                # Utente ha acconsentito, puoi iniziare con le domande di profilazione
+                bot_telegram.send_message(user_id, "Ottimo! Cominciamo con le domande di profilazione 👤")
+                self.invia_domanda_attuale(user_id)  # Inizia chiedendo la prima domanda
+            if user_response == 'consenso_modifica_no':
+                # Utente ha rifiutato, puoi gestire di conseguenza
+                bot_telegram.send_message(user_id,
+                                          "Puoi utilizzare il bot, ma non acconsentendo alla profilazione, "
+                                          "le mie risposte risulteranno meno efficienti😢")
+                self.profile_completed = True
 
             if user_response == 'consenso_si':
                 # Utente ha acconsentito, puoi iniziare con le domande di profilazione
@@ -491,6 +502,11 @@ class ProfilazioneBot:
                 elif check_time_in_range(current_time_reminder, ORA_CENA_START, ORA_CENA_END):
                     bot_telegram.send_message(user_id,
                                               "Cena time! 🍽 Cosa hai mangiato a cena? \n⚠️ Indica prima del cibo la quantità.")
+                else:
+                    print("Non è orario per i reminder")
+
+
+
             elif user_response.startswith('consumo_acqua_'):
                 consumo_acqua_selezionato = user_response[len('consumo_acqua_'):]
                 print(consumo_acqua_selezionato)

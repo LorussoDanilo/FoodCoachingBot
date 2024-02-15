@@ -165,6 +165,8 @@ def write_chatgpt_for_dieta_info(openai, profilo_utente, mysql_cursor, telegram_
         obiettivo = str(obiettivo) if obiettivo is not None else "Non definito"
 
         dieta_settimanale_info = get_dieta_settimanale_info(mysql_cursor, telegram_id)
+        consumo_acqua_medio = get_avg_water_consumption(mysql_cursor, telegram_id)
+
 
         if dieta_settimanale_info:
             # Costruisci una rappresentazione testuale delle diete settimanali

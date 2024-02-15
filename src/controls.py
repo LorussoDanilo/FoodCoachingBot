@@ -30,7 +30,7 @@ def is_food_question(question):
         """
     # Aggiungi qui la tua logica per determinare se la domanda riguarda il cibo
     # Ad esempio, potresti usare delle parole chiave o espressioni regolari
-    food_keywords = ["cibo", "pasto", "mangiare", "malattie", "disturbi", "nutrizionali", "ingredienti", "ingrediente",
+    food_keywords = ["cibo", "pasto", "mangiare", "malattie", "disturbi", "nutrizionali", "nutrizionale", "ingredienti", "ingrediente",
                      "cibo,", "nutrizione", "alimenti", "nutrienti", "dieta", "proteine", "carboidrati", "grassi",
                      "fibre", "vitamine", "minerali", "calorie", "antiossidanti",
                      "alimenti", "biologico", "integrali", "integrale", "pianta-based", "prodotti", "vegetale",
