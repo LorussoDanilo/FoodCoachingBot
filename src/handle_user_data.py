@@ -5,6 +5,7 @@ testuali e foto
     Danilo Lorusso - Version 1.0
 """
 
+import base64
 import io
 import locale
 import logging
@@ -12,17 +13,15 @@ import os
 import subprocess
 import tempfile
 from datetime import datetime, time
-from sqlite3 import IntegrityError
-from PIL import Image  # Add this import
 from io import BytesIO
-import base64
+from sqlite3 import IntegrityError
+
 import requests
 import speech_recognition as sr
+from PIL import Image  # Add this import
 from mysql.connector import errorcode
 from pydub import AudioSegment
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
-import json
-
 
 from src.connection import connect_mysql
 from src.controls import check_time_in_range
@@ -468,6 +467,7 @@ class ProfilazioneBot:
                 elif check_time_in_range(current_time_reminder, ORA_PRANZO_START, ORA_PRANZO_END):
                     bot_telegram.send_message(user_id,
                                               "Pranzo time! 🍽 Cosa hai mangiato a pranzo? \n⚠️ Indica prima del cibo la quantità.")
+                    print("sei a pranzo")
 
                 elif check_time_in_range(current_time_reminder, ORA_CENA_START, ORA_CENA_END):
                     bot_telegram.send_message(user_id,

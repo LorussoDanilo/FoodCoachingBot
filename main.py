@@ -22,6 +22,7 @@ from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.pdfgen import canvas
 from reportlab.platypus import Paragraph
+from telebot.formatting import escape_markdown
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 from src.chatGPT_response import write_chatgpt, write_chatgpt_for_dieta_info
@@ -157,6 +158,7 @@ INFO_COMMAND = 'info'
 CANCELLA_COMMAND = 'cancella'
 CONSUMO_ACQUA_COMMAND = 'consumo_acqua'
 DIETA_SANA_COMMAND = 'dieta_sana'
+CALCOLA_IMC_COMMAND = 'imc'
 
 # Periodo giorno
 meal_type = None
@@ -180,12 +182,12 @@ event = threading.Event()
 ORA_COLAZIONE_START = time(6, 0)
 ORA_COLAZIONE_END = time(9, 0)
 ORA_PRANZO_START = time(12, 0)
-ORA_PRANZO_END = time(15, 00)
-ORA_CENA_START = time(18, 00)
-ORA_CENA_END = time(21, 00)
+ORA_PRANZO_END = time(15, 0)
+ORA_CENA_START = time(18, 0)
+ORA_CENA_END = time(21, 0)
 
 ORA_ACQUA_START = time(22, 00)
-ORA_ACQUA_END = time(23, 00)
+ORA_ACQUA_END = time(22, 00)
 
 ORA_REMINDER_SETTIMANALE = time(16, 00)
 
@@ -474,6 +476,49 @@ if __name__ == '__main__':
         bot_telegram.send_message(telegram_id, msg.replace('{nome}', message.chat.first_name))
 
 
+    @bot_telegram.message_handler(commands=[CALCOLA_IMC_COMMAND])
+    def show_user_imc(message):
+        """
+        Questa funzione serve per visualizzare le info sulle funzionalità del bot
+        :type message: Message
+        :return: messaggio di info
+        :rtype: Message
+        """
+        telegram_id = message.chat.id
+        user_profile = get_user_profile(telegram_id)
+        altezza = user_profile.get('altezza')/100
+        print(altezza)
+        peso = user_profile.get('peso')
+        imc = peso/(altezza*altezza)
+        if altezza:
+            # Crea il messaggio in base alla fascia di IMC
+            if imc < 16:
+                messaggio = "Il tuo IMC è <b>{:.2f}</b>, \n🟥 Sei <b>SOTTOPESO MOLTO GRAVE</b>.".format(imc)
+            elif 16 <= imc < 17:
+                messaggio = "Il tuo IMC è <b>{:.2f}</b>, \n🟧 Sei <b>SOTTOPESO GRAVE</b>".format(imc)
+            elif 17 <= imc < 18.5:
+                messaggio = "Il tuo IMC è <b>{:.2f}</b>, \n🟨 <b>Sei SOTTOPESO</b>".format(imc)
+            elif 18.5 <= imc < 24.9:
+                messaggio = "Il tuo IMC è <b>{:.2f}</b>, \n🟩 <b>Sei NORMOPESO</b>".format(imc)
+            elif 25 <= imc < 29.9:
+                messaggio = "Il tuo IMC è <b>{:.2f}</b>, \n🟨 <b>Sei in SOVRAPPESO</b>".format(imc)
+            elif 30 <= imc < 34.9:
+                messaggio = "Il tuo IMC è <b>{:.2f}</b>, \n🟧 <b>Hai OBESITA' DI GRADO I</b>".format(imc)
+            elif 35 <= imc < 39.9:
+                messaggio = "Il tuo IMC è <b>{:.2f}</b>, \n🟥 <b>Hai OBESITA' DI GRADO II</b>".format(imc)
+            else:
+                messaggio = "Il tuo IMC è <b>{:.2f}</b>, \n🟥 <b>Hai una grave OBESITA'</b>".format(imc)
+
+            # Allega l'immagine dal path del progetto
+            immagine_path = "IMC-2-1.png"
+            with open(immagine_path, "rb") as photo:
+                bot_telegram.send_photo(chat_id=telegram_id, parse_mode='HTML', photo=photo, caption=messaggio)
+
+
+        else:
+            bot_telegram.send_message(telegram_id, "Mi dispiace, ma non hai inserito i dati del tuo profilo😢")
+
+
     # metodo per gestire il comando /profilo per visualizzare i dati del profilo
     @bot_telegram.message_handler(commands=[PROFILO_COMMAND])
     def show_user_profile(message):
@@ -679,17 +724,16 @@ if __name__ == '__main__':
                     reminder_thread.start()
 
                 else:
-
-                    reminder_week_message_thread = threading.Thread(target=send_week_reminder_message, daemon=True,
+                    if check_time_in_range(current_time_reminder, ORA_REMINDER_SETTIMANALE, ORA_REMINDER_SETTIMANALE):
+                        reminder_week_message_thread = threading.Thread(target=send_week_reminder_message, daemon=True,
                                                                     args=(event, bot_telegram,))
 
-                    reminder_week_message_thread.start()
+                        reminder_week_message_thread.start()
 
                     if check_time_in_range(current_time_reminder, ORA_ACQUA_START, ORA_ACQUA_END):
                         reminder_water_message_thread = threading.Thread(target=send_water_reminder_message, daemon=True,
                                                                      args=(event, bot_telegram,))
                         reminder_water_message_thread.start()
-
 
                     if message.reply_to_message and message.reply_to_message.text in user_response_message:
                         user_profile = get_user_profile(telegram_id)
@@ -704,6 +748,7 @@ if __name__ == '__main__':
                         )
                         response_chunks = write_chatgpt(bot_telegram, openai, user_response_reply, user_profile,
                                                         mysql_cursor, telegram_id)
+                        print(response_chunks)
 
                         if response_chunks == frase_is_food:
                             bot_telegram.send_message(telegram_id, frase_is_food)
@@ -711,16 +756,15 @@ if __name__ == '__main__':
 
                             # Invia ciascun elemento della lista ogni 5 secondi
                             for chunk in response_chunks:
-                                # Suddividi il chunk in pezzi da 400 parole
+                                # Split based on words, not characters
                                 splitted = split_chunks(chunk)
 
-                                # Invia ciascun pezzo ogni 5 secondi
-                                for index, split_chunk in enumerate(splitted):
-                                    if index == len(splitted) - 1:  # Verifica se è l'ultimo elemento
-                                        split_chunk += "\nE' tutto. Sono a tua disposizione per altre domande."
-                                    else:
-                                        split_chunk += "..."
-                                    bot_telegram.send_message(telegram_id, split_chunk, trem.sleep(8))
+                                # Send a message every 400 words
+                                for split_chunk in splitted:
+                                    bot_telegram.send_message(telegram_id, split_chunk + "...")
+                                    # Sleep for 8 seconds after sending each chunk
+                                    trem.sleep(8)
+                            bot_telegram.send_message(telegram_id, "Sono a tua disposizione per altre domande😊")
 
                     else:
                         if not check_time_in_range(current_time_reminder, ORA_COLAZIONE_START,
@@ -751,6 +795,7 @@ if __name__ == '__main__':
                                             bot_telegram.send_message(telegram_id, split_chunk + "...")
                                             # Sleep for 8 seconds after sending each chunk
                                             trem.sleep(8)
+                                    bot_telegram.send_message(telegram_id, "Sono a tua disposizione per altre domande😊")
 
 
                             elif message.content_type == 'voice':
@@ -829,7 +874,7 @@ def handle_reminder_response(message):
                                             text, app_id, app_key)
 
                 event.clear()
-                event.wait(60*60*3)
+                event.wait(60)
                 event_send_reminder.set()
                 event.set()
         elif check_time_in_range(current_time_reminder, ORA_PRANZO_START, ORA_PRANZO_END):
@@ -855,7 +900,7 @@ def handle_reminder_response(message):
                     save_user_food_response(bot_telegram, mysql_cursor, mysql_connection, telegram_id, meal_type,
                                             text, app_id, app_key)
                 event.clear()
-                event.wait(60*60*3)
+                event.wait(60)
                 event_send_reminder.set()
                 event.set()
 
@@ -885,11 +930,12 @@ def handle_reminder_response(message):
                                             text, app_id, app_key)
 
                 event.clear()
-                event.wait(60*60*3)
+                event.wait(60)
                 event_send_reminder.set()
                 event.set()
         else:
             handle_profile_response(message)
+            event.wait(60)
             event.clear()
 
     except Exception as main_exception:
@@ -943,6 +989,8 @@ def voice_handler(message):
                 for split_chunk in splitted:
                     split_chunk += "..."
                     bot_telegram.send_message(telegram_id, split_chunk, trem.sleep(8))
+
+            bot_telegram.send_message(telegram_id, "Sono a tua disposizione per altre domande😊")
         # chiamare il metodo per cancellare i file .ogg e .wav generati
         clear_audio()
 
@@ -982,6 +1030,7 @@ def photo_handler(message):
                 for split_chunk in splitted:
                     split_chunk += "..."
                     bot_telegram.send_message(telegram_id, split_chunk, trem.sleep(8))
+            bot_telegram.send_message(telegram_id, "Sono a tua disposizione per altre domande😊")
     else:
         results = photo_result
         user_profile = get_user_profile(telegram_id)
@@ -1002,6 +1051,7 @@ def photo_handler(message):
                 for split_chunk in splitted:
                     split_chunk += "..."
                     bot_telegram.send_message(telegram_id, split_chunk, trem.sleep(8))
+            bot_telegram.send_message(telegram_id, "Sono a tua disposizione per altre domande😊")
 
 
 def send_reminder_message(event, bot_telegram, ORA_COLAZIONE_START, ORA_COLAZIONE_END, ORA_PRANZO_START, ORA_PRANZO_END,
@@ -1035,7 +1085,6 @@ def send_reminder_message(event, bot_telegram, ORA_COLAZIONE_START, ORA_COLAZION
     telegram_ids = get_all_telegram_ids()
 
     current_time_reminder = datetime.now().time()
-    # Serializzazione dell'oggetto Message
 
     while event.is_set() and event_send_reminder.is_set():
         for telegram_id in telegram_ids:
@@ -1043,20 +1092,21 @@ def send_reminder_message(event, bot_telegram, ORA_COLAZIONE_START, ORA_COLAZION
                 bot_telegram.send_message(telegram_id,
                                           "Colazione time! 🥛 Cosa hai mangiato a colazione? \n⚠️ Indica prima del cibo "
                                           "la quantità.",
-                                          trem.sleep(60*60*3))
-                event_send_reminder.clear()  # Disattiva l'evento per inviare il reminder
+                                          trem.sleep(60*60))
 
             elif check_time_in_range(current_time_reminder, ORA_PRANZO_START, ORA_PRANZO_END):
                 bot_telegram.send_message(telegram_id,
                                           "Pranzo time! 🍽 Cosa hai mangiato a pranzo? \n⚠️ Indica prima del cibo la quantità.",
-                                          trem.sleep(60*60*3))
+                                          trem.sleep(60*60))
                 event_send_reminder.clear()  # Disattiva l'evento per inviare il reminder
+
 
             elif check_time_in_range(current_time_reminder, ORA_CENA_START, ORA_CENA_END):
                 bot_telegram.send_message(telegram_id,
                                           "Cena time! 🍽 Cosa hai mangiato a cena? \n⚠️ Indica prima del cibo la quantità.",
-                                          trem.sleep(60*60*3))
+                                          trem.sleep(60*60))
             else:
+                event.wait(60*60)
                 event.clear()
 
             event_send_reminder.clear()  # Disattiva l'evento per inviare il reminder

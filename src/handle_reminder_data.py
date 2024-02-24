@@ -62,7 +62,7 @@ def send_water_reminder_message(event, bot_telegram):
         for telegram_id in telegram_ids:
             bot_telegram.send_message(telegram_id,
                                       "💧Registra il tuo consumo di acqua di oggi con il comando /consumo_acqua💧",
-                                      trem.sleep(60*60*24))
+                                      trem.sleep(20))
 
 
 def get_or_insert_dieta_settimanale(cursor, telegram_id, date):
